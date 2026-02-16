@@ -59,18 +59,21 @@ class SearchCollector implements CollectorInterface
         $indexCount = is_array($indices) ? count($indices) : 0;
 
         // 3. Determine status
+        $numberOfNodes = (int) ($health['number_of_nodes'] ?? 0);
         $status = self::STATUS_HEALTHY;
         if ($clusterStatus === 'red' || $indexCount === 0) {
             $status = self::STATUS_CRITICAL;
-        } elseif ($clusterStatus === 'yellow') {
+        } elseif ($clusterStatus === 'yellow' && $numberOfNodes > 1) {
+            // Yellow on multi-node = real issue (replicas should be assigned)
             $status = self::STATUS_DEGRADED;
         }
+        // Yellow on single-node is expected (replicas can't be assigned)
 
         return [
             'status' => $status,
             'engine' => $engine,
             'cluster_status' => $clusterStatus,
-            'number_of_nodes' => (int) ($health['number_of_nodes'] ?? 0),
+            'number_of_nodes' => $numberOfNodes,
             'active_shards' => (int) ($health['active_shards'] ?? 0),
             'unassigned_shards' => (int) ($health['unassigned_shards'] ?? 0),
             'pending_tasks' => (int) ($health['number_of_pending_tasks'] ?? 0),
