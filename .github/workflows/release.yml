@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate before release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: redis, curl, openssl
+          tools: composer:v2
+
+      - name: PHP syntax check
+        run: find . -name '*.php' -not -path './.git/*' | xargs -n1 php -l
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag name
+        id: tag
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | head -n 2 | tail -n 1)
+
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ steps.tag.outputs.version }}" ]; then
+            # First release — list all commits
+            CHANGES=$(git log --pretty=format:"- %s" HEAD)
+          else
+            CHANGES=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
+          fi
+
+          # Write to file to handle multiline
+          echo "$CHANGES" > /tmp/changelog.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.tag.outputs.version }}
+          body_path: /tmp/changelog.md
+          generate_release_notes: true
+          make_latest: true
