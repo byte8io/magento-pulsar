@@ -23,6 +23,8 @@
                 <ssl_enabled>1</ssl_enabled>
                 <orders_enabled>1</orders_enabled>
                 <integrations_enabled>1</integrations_enabled>
+                <phpfpm_enabled>0</phpfpm_enabled>
+                <phpfpm_status_url>http://localhost/status?json</phpfpm_status_url>
             </checks>
         </byte8_pulsar>
     </default>

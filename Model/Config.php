@@ -26,6 +26,7 @@ class Config
     private const XML_PATH_SSL_ENABLED = 'byte8_pulsar/checks/ssl_enabled';
     private const XML_PATH_ORDERS_ENABLED = 'byte8_pulsar/checks/orders_enabled';
     private const XML_PATH_INTEGRATIONS_ENABLED = 'byte8_pulsar/checks/integrations_enabled';
+    private const XML_PATH_PHPFPM_ENABLED = 'byte8_pulsar/checks/phpfpm_enabled';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -122,6 +123,11 @@ class Config
         return $this->scopeConfig->isSetFlag(self::XML_PATH_INTEGRATIONS_ENABLED);
     }
 
+    public function isPhpFpmCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_PHPFPM_ENABLED);
+    }
+
     public function isCheckEnabled(string $checkName): bool
     {
         return match ($checkName) {
@@ -140,6 +146,7 @@ class Config
             'ssl' => $this->isSslCheckEnabled(),
             'orders' => $this->isOrdersCheckEnabled(),
             'integrations' => $this->isIntegrationsCheckEnabled(),
+            'phpfpm' => $this->isPhpFpmCheckEnabled(),
             default => false,
         };
     }

@@ -9,7 +9,7 @@ use Psr\Log\LoggerInterface;
 
 class HealthCheck
 {
-    private const MODULE_VERSION = '1.4.0';
+    private const MODULE_VERSION = '1.5.0';
 
     /**
      * @param CollectorInterface[] $collectors

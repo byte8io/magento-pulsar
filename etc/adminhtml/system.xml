@@ -96,6 +96,18 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Check API integrations and OAuth token health</comment>
                 </field>
+                <field id="phpfpm_enabled" translate="label comment" type="select" sortOrder="160" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>PHP-FPM Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Check PHP-FPM process pool saturation. Requires <code>pm.status_path = /status</code> in your php-fpm pool config.]]></comment>
+                </field>
+                <field id="phpfpm_status_url" translate="label comment" type="text" sortOrder="161" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>PHP-FPM Status URL</label>
+                    <comment>URL to the PHP-FPM status page (default: http://localhost/status?json)</comment>
+                    <depends>
+                        <field id="phpfpm_enabled">1</field>
+                    </depends>
+                </field>
             </group>
         </section>
     </system>

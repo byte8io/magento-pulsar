@@ -21,6 +21,7 @@
                 <item name="ssl" xsi:type="object">Byte8\Pulsar\Model\Collector\SslCollector</item>
                 <item name="orders" xsi:type="object">Byte8\Pulsar\Model\Collector\OrderCollector</item>
                 <item name="integrations" xsi:type="object">Byte8\Pulsar\Model\Collector\IntegrationCollector</item>
+                <item name="phpfpm" xsi:type="object">Byte8\Pulsar\Model\Collector\PhpFpmCollector</item>
             </argument>
         </arguments>
     </type>
