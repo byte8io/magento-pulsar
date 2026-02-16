@@ -15,7 +15,7 @@
                 </field>
                 <field id="api_key" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>API Key</label>
-                    <comment><![CDATA[Enter this key in your Pulsar dashboard. Requests must include header: <code>X-Pulsar-Key: your-api-key</code>]]></comment>
+                    <comment><![CDATA[Auto-generated during installation. Copy this key into your Pulsar dashboard. To regenerate, clear the field and save. Requests must include header: <code>X-Pulsar-Key: your-api-key</code>]]></comment>
                     <backend_model>Byte8\Pulsar\Model\Config\Backend\ApiKey</backend_model>
                 </field>
             </group>
@@ -55,6 +55,46 @@
                     <label>Message Queue Status</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Check message queue depth, failed messages, and consumer health</comment>
+                </field>
+                <field id="deploy_enabled" translate="label comment" type="select" sortOrder="80" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Deploy Mode Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check deploy mode, maintenance status, and compilation state</comment>
+                </field>
+                <field id="redis_enabled" translate="label comment" type="select" sortOrder="90" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Redis Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check Redis connectivity and memory for session, cache, and page cache</comment>
+                </field>
+                <field id="log_enabled" translate="label comment" type="select" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Log Health Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check log file sizes, debug logging, and error report accumulation</comment>
+                </field>
+                <field id="admin_security_enabled" translate="label comment" type="select" sortOrder="110" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Admin Security Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check failed login attempts, locked accounts, and 2FA status</comment>
+                </field>
+                <field id="config_hygiene_enabled" translate="label comment" type="select" sortOrder="120" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Config Hygiene Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check for production misconfigurations (template hints, minification, etc.)</comment>
+                </field>
+                <field id="ssl_enabled" translate="label comment" type="select" sortOrder="130" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>SSL Certificate Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check SSL certificate validity and expiry for the store base URL</comment>
+                </field>
+                <field id="orders_enabled" translate="label comment" type="select" sortOrder="140" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Order Pipeline Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check for stuck orders and payment failures</comment>
+                </field>
+                <field id="integrations_enabled" translate="label comment" type="select" sortOrder="150" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Integration Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check API integrations and OAuth token health</comment>
                 </field>
             </group>
         </section>

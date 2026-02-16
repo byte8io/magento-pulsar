@@ -13,6 +13,14 @@
                 <item name="system" xsi:type="object">Byte8\Pulsar\Model\Collector\SystemCollector</item>
                 <item name="search" xsi:type="object">Byte8\Pulsar\Model\Collector\SearchCollector</item>
                 <item name="queue" xsi:type="object">Byte8\Pulsar\Model\Collector\QueueCollector</item>
+                <item name="deploy" xsi:type="object">Byte8\Pulsar\Model\Collector\DeployCollector</item>
+                <item name="redis" xsi:type="object">Byte8\Pulsar\Model\Collector\RedisCollector</item>
+                <item name="log" xsi:type="object">Byte8\Pulsar\Model\Collector\LogCollector</item>
+                <item name="admin_security" xsi:type="object">Byte8\Pulsar\Model\Collector\AdminSecurityCollector</item>
+                <item name="config_hygiene" xsi:type="object">Byte8\Pulsar\Model\Collector\ConfigHygieneCollector</item>
+                <item name="ssl" xsi:type="object">Byte8\Pulsar\Model\Collector\SslCollector</item>
+                <item name="orders" xsi:type="object">Byte8\Pulsar\Model\Collector\OrderCollector</item>
+                <item name="integrations" xsi:type="object">Byte8\Pulsar\Model\Collector\IntegrationCollector</item>
             </argument>
         </arguments>
     </type>

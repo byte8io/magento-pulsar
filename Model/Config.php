@@ -18,6 +18,14 @@ class Config
     private const XML_PATH_SYSTEM_ENABLED = 'byte8_pulsar/checks/system_enabled';
     private const XML_PATH_SEARCH_ENABLED = 'byte8_pulsar/checks/search_enabled';
     private const XML_PATH_QUEUE_ENABLED = 'byte8_pulsar/checks/queue_enabled';
+    private const XML_PATH_DEPLOY_ENABLED = 'byte8_pulsar/checks/deploy_enabled';
+    private const XML_PATH_REDIS_ENABLED = 'byte8_pulsar/checks/redis_enabled';
+    private const XML_PATH_LOG_ENABLED = 'byte8_pulsar/checks/log_enabled';
+    private const XML_PATH_ADMIN_SECURITY_ENABLED = 'byte8_pulsar/checks/admin_security_enabled';
+    private const XML_PATH_CONFIG_HYGIENE_ENABLED = 'byte8_pulsar/checks/config_hygiene_enabled';
+    private const XML_PATH_SSL_ENABLED = 'byte8_pulsar/checks/ssl_enabled';
+    private const XML_PATH_ORDERS_ENABLED = 'byte8_pulsar/checks/orders_enabled';
+    private const XML_PATH_INTEGRATIONS_ENABLED = 'byte8_pulsar/checks/integrations_enabled';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -74,6 +82,46 @@ class Config
         return $this->scopeConfig->isSetFlag(self::XML_PATH_QUEUE_ENABLED);
     }
 
+    public function isDeployCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_DEPLOY_ENABLED);
+    }
+
+    public function isRedisCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_REDIS_ENABLED);
+    }
+
+    public function isLogCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_LOG_ENABLED);
+    }
+
+    public function isAdminSecurityCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_ADMIN_SECURITY_ENABLED);
+    }
+
+    public function isConfigHygieneCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_CONFIG_HYGIENE_ENABLED);
+    }
+
+    public function isSslCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_SSL_ENABLED);
+    }
+
+    public function isOrdersCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_ORDERS_ENABLED);
+    }
+
+    public function isIntegrationsCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_INTEGRATIONS_ENABLED);
+    }
+
     public function isCheckEnabled(string $checkName): bool
     {
         return match ($checkName) {
@@ -84,6 +132,14 @@ class Config
             'system' => $this->isSystemCheckEnabled(),
             'search' => $this->isSearchCheckEnabled(),
             'queue' => $this->isQueueCheckEnabled(),
+            'deploy' => $this->isDeployCheckEnabled(),
+            'redis' => $this->isRedisCheckEnabled(),
+            'log' => $this->isLogCheckEnabled(),
+            'admin_security' => $this->isAdminSecurityCheckEnabled(),
+            'config_hygiene' => $this->isConfigHygieneCheckEnabled(),
+            'ssl' => $this->isSslCheckEnabled(),
+            'orders' => $this->isOrdersCheckEnabled(),
+            'integrations' => $this->isIntegrationsCheckEnabled(),
             default => false,
         };
     }

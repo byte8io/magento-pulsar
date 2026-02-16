@@ -34,9 +34,10 @@ class ApiKey extends Value
 
     public function beforeSave(): self
     {
-        $value = $this->getValue();
+        $value = (string) $this->getValue();
 
-        if (empty($value)) {
+        // If user cleared the field, generate a new key
+        if ($value === '' || $value === '******') {
             $value = $this->generateApiKey();
         }
 
