@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <!-- Health Check Collector Pool -->
+    <type name="Byte8\Pulsar\Model\HealthCheck">
+        <arguments>
+            <argument name="collectors" xsi:type="array">
+                <item name="cron" xsi:type="object">Byte8\Pulsar\Model\Collector\CronCollector</item>
+                <item name="indexer" xsi:type="object">Byte8\Pulsar\Model\Collector\IndexerCollector</item>
+                <item name="cache" xsi:type="object">Byte8\Pulsar\Model\Collector\CacheCollector</item>
+                <item name="database" xsi:type="object">Byte8\Pulsar\Model\Collector\DatabaseCollector</item>
+                <item name="system" xsi:type="object">Byte8\Pulsar\Model\Collector\SystemCollector</item>
+                <item name="search" xsi:type="object">Byte8\Pulsar\Model\Collector\SearchCollector</item>
+                <item name="queue" xsi:type="object">Byte8\Pulsar\Model\Collector\QueueCollector</item>
+            </argument>
+        </arguments>
+    </type>
+
+</config>

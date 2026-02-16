@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <byte8_pulsar>
+            <general>
+                <enabled>1</enabled>
+                <api_key/>
+            </general>
+            <checks>
+                <cron_enabled>1</cron_enabled>
+                <indexer_enabled>1</indexer_enabled>
+                <cache_enabled>1</cache_enabled>
+                <database_enabled>1</database_enabled>
+                <system_enabled>1</system_enabled>
+                <search_enabled>1</search_enabled>
+                <queue_enabled>1</queue_enabled>
+            </checks>
+        </byte8_pulsar>
+    </default>
+</config>

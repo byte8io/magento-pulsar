@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system.xsd">
+    <system>
+        <section id="byte8_pulsar" translate="label" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+            <label>Pulsar Health Monitoring</label>
+            <tab>byte8</tab>
+            <resource>Byte8_Pulsar::config</resource>
+            <group id="general" translate="label" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>General Settings</label>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Health Endpoint</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Enable or disable the /pulsar/health endpoint</comment>
+                </field>
+                <field id="api_key" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>API Key</label>
+                    <comment><![CDATA[Enter this key in your Pulsar dashboard. Requests must include header: <code>X-Pulsar-Key: your-api-key</code>]]></comment>
+                    <backend_model>Byte8\Pulsar\Model\Config\Backend\ApiKey</backend_model>
+                </field>
+            </group>
+            <group id="checks" translate="label" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Health Check Options</label>
+                <field id="cron_enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Cron Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check cron job health and stuck jobs</comment>
+                </field>
+                <field id="indexer_enabled" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Indexer Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check indexer health and invalid indexes</comment>
+                </field>
+                <field id="cache_enabled" translate="label comment" type="select" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Cache Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check cache types and invalidation status</comment>
+                </field>
+                <field id="database_enabled" translate="label comment" type="select" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Database Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check database connectivity</comment>
+                </field>
+                <field id="system_enabled" translate="label comment" type="select" sortOrder="50" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>System Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check PHP version, disk space, and memory</comment>
+                </field>
+                <field id="search_enabled" translate="label comment" type="select" sortOrder="60" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Search Engine Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check Elasticsearch/OpenSearch cluster health and catalog index status</comment>
+                </field>
+                <field id="queue_enabled" translate="label comment" type="select" sortOrder="70" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Message Queue Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Check message queue depth, failed messages, and consumer health</comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
