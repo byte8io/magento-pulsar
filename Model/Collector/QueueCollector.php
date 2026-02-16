@@ -56,13 +56,10 @@ class QueueCollector implements CollectorInterface
             $completed = (int) ($rows[self::MSG_STATUS_COMPLETE] ?? 0);
 
             // Find the oldest unprocessed message to measure queue age
-            $messageTable = $this->resourceConnection->getTableName('queue_message');
             $oldestPending = $connection->fetchOne(sprintf(
-                'SELECT MIN(m.updated_at) FROM %s ms'
-                . ' JOIN %s m ON ms.message_id = m.id'
+                'SELECT MIN(ms.updated_at) FROM %s ms'
                 . ' WHERE ms.status IN (%d, %d)',
                 $statusTable,
-                $messageTable,
                 self::MSG_STATUS_NEW,
                 self::MSG_STATUS_RETRY_REQUIRED
             ));
@@ -87,7 +84,7 @@ class QueueCollector implements CollectorInterface
         } catch (\Exception $e) {
             return [
                 'status' => self::STATUS_CRITICAL,
-                'error' => 'Queue check failed',
+                'error' => 'Queue check failed: ' . $e->getMessage(),
             ];
         }
     }
