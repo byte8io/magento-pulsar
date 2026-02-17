@@ -83,6 +83,11 @@ class SearchCollector implements CollectorInterface
 
     private function getEngineConfig(string $engine): array
     {
+        // ElasticSuite stores connection config in its own config path
+        if ($engine === 'elasticsuite') {
+            return $this->getElasticSuiteConfig();
+        }
+
         $prefix = match ($engine) {
             'opensearch' => 'catalog/search/opensearch_',
             default => 'catalog/search/elasticsearch7_',
@@ -95,6 +100,33 @@ class SearchCollector implements CollectorInterface
             'username' => $this->scopeConfig->getValue($prefix . 'username') ?? '',
             'password' => $this->scopeConfig->getValue($prefix . 'password') ?? '',
             'index_prefix' => $this->scopeConfig->getValue($prefix . 'index_prefix') ?? 'magento2',
+        ];
+    }
+
+    private function getElasticSuiteConfig(): array
+    {
+        $basePath = 'smile_elasticsuite_core_base_settings/es_client/';
+
+        // ElasticSuite stores servers as "host:port" (e.g. "localhost:9500")
+        $servers = $this->scopeConfig->getValue($basePath . 'servers') ?? 'localhost:9200';
+        $parts = explode(':', $servers, 2);
+        $hostname = $parts[0] ?: 'localhost';
+        $port = $parts[1] ?? '9200';
+
+        $enableAuth = (bool) $this->scopeConfig->getValue($basePath . 'enable_https_mode');
+        $username = $this->scopeConfig->getValue($basePath . 'http_auth_user') ?? '';
+        $password = $this->scopeConfig->getValue($basePath . 'http_auth_pwd') ?? '';
+
+        $indicesPath = 'smile_elasticsuite_core_base_settings/indices_settings/';
+        $indexPrefix = $this->scopeConfig->getValue($indicesPath . 'alias') ?? 'magento2';
+
+        return [
+            'hostname' => $hostname,
+            'port' => $port,
+            'enable_auth' => $enableAuth && !empty($username),
+            'username' => $username,
+            'password' => $password,
+            'index_prefix' => $indexPrefix,
         ];
     }
 
