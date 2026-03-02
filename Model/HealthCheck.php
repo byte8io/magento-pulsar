@@ -12,6 +12,20 @@ class HealthCheck
     private const MODULE_VERSION = '1.5.0';
 
     /**
+     * Tier 1: Site-critical collectors. A critical status here means the
+     * storefront is likely unavailable or severely broken for customers.
+     */
+    private const TIER1_COLLECTORS = [
+        'database',
+        'search',
+        'cache',
+        'redis',
+        'ssl',
+        'system',
+        'phpfpm',
+    ];
+
+    /**
      * @param CollectorInterface[] $collectors
      */
     public function __construct(
@@ -41,8 +55,10 @@ class HealthCheck
                 $checks[$name] = $result;
 
                 $checkStatus = $result['status'] ?? CollectorInterface::STATUS_HEALTHY;
-                if ($statusPriority[$checkStatus] > $statusPriority[$overallStatus]) {
-                    $overallStatus = $checkStatus;
+                $effectiveStatus = $this->getEffectiveStatus($name, $checkStatus);
+
+                if ($statusPriority[$effectiveStatus] > $statusPriority[$overallStatus]) {
+                    $overallStatus = $effectiveStatus;
                 }
             } catch (\Exception $e) {
                 $this->logger->error('Pulsar health check failed', [
@@ -53,7 +69,14 @@ class HealthCheck
                     'status' => CollectorInterface::STATUS_CRITICAL,
                     'error' => 'Check failed',
                 ];
-                $overallStatus = CollectorInterface::STATUS_CRITICAL;
+
+                $effectiveStatus = $this->getEffectiveStatus(
+                    $name,
+                    CollectorInterface::STATUS_CRITICAL
+                );
+                if ($statusPriority[$effectiveStatus] > $statusPriority[$overallStatus]) {
+                    $overallStatus = $effectiveStatus;
+                }
             }
         }
 
@@ -63,5 +86,27 @@ class HealthCheck
             'version' => self::MODULE_VERSION,
             'checks' => $checks,
         ];
+    }
+
+    /**
+     * Get the effective status for overall health computation.
+     *
+     * Tier 1 (site-critical) collectors contribute their actual status.
+     * Tier 2 (operational) collectors have their critical status capped
+     * at degraded — they represent issues that need attention but don't
+     * mean the storefront is down for customers.
+     *
+     * Note: individual collector statuses in $checks are NOT modified,
+     * so per-collector alerts still fire as critical when appropriate.
+     */
+    private function getEffectiveStatus(string $collectorName, string $status): string
+    {
+        if ($status === CollectorInterface::STATUS_CRITICAL
+            && !in_array($collectorName, self::TIER1_COLLECTORS, true)
+        ) {
+            return CollectorInterface::STATUS_DEGRADED;
+        }
+
+        return $status;
     }
 }
