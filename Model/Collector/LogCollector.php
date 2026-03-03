@@ -11,7 +11,7 @@ class LogCollector implements CollectorInterface
 {
     private const LOG_WARNING_BYTES = 524_288_000;    // 500 MB
     private const LOG_CRITICAL_BYTES = 2_147_483_648; // 2 GB
-    private const REPORT_WARNING_COUNT = 100;
+    private const REPORT_WARNING_COUNT = 500;
     private const REPORT_CRITICAL_COUNT = 1000;
     private const REPORT_COUNT_CAP = 10_000;
 

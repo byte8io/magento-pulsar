@@ -35,9 +35,10 @@ class RedisCollector implements CollectorInterface
 
         if (!extension_loaded('redis')) {
             return [
-                'status' => self::STATUS_DEGRADED,
+                'status' => self::STATUS_HEALTHY,
                 'configured' => true,
-                'error' => 'PHP Redis extension not available for health checks',
+                'monitoring_available' => false,
+                'note' => 'PHP Redis extension not available for health checks',
             ];
         }
 

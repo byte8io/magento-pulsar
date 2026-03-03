@@ -72,7 +72,7 @@ class CronCollector implements CollectorInterface
         $status = self::STATUS_HEALTHY;
         if (!$heartbeatAlive || $stuckJobs > 0 || $lastRunAt === null) {
             $status = self::STATUS_CRITICAL;
-        } elseif ($failedJobs > 5 || $pendingJobs > 100) {
+        } elseif ($failedJobs > 5 || $pendingJobs > 200) {
             $status = self::STATUS_DEGRADED;
         }
 
