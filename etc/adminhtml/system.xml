@@ -108,6 +108,23 @@
                         <field id="phpfpm_enabled">1</field>
                     </depends>
                 </field>
+                <field id="media_integrity_enabled" translate="label comment" type="select" sortOrder="170" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Media Integrity Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Scan pub/media/ for PHP webshells and suspicious file accumulation in upload directories</comment>
+                </field>
+                <field id="upload_endpoint_enabled" translate="label comment" type="select" sortOrder="180" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Upload Endpoint Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Monitor access logs for automated POST requests to file-upload endpoints</comment>
+                </field>
+                <field id="upload_endpoint_log_path" translate="label comment" type="text" sortOrder="181" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Access Log Path</label>
+                    <comment>Absolute path to the web server access log. Leave empty to auto-detect common locations (/var/log/nginx/access.log, etc.)</comment>
+                    <depends>
+                        <field id="upload_endpoint_enabled">1</field>
+                    </depends>
+                </field>
             </group>
         </section>
     </system>

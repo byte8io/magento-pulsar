@@ -22,6 +22,8 @@
                 <item name="orders" xsi:type="object">Byte8\Pulsar\Model\Collector\OrderCollector</item>
                 <item name="integrations" xsi:type="object">Byte8\Pulsar\Model\Collector\IntegrationCollector</item>
                 <item name="phpfpm" xsi:type="object">Byte8\Pulsar\Model\Collector\PhpFpmCollector</item>
+                <item name="media_integrity" xsi:type="object">Byte8\Pulsar\Model\Collector\MediaIntegrityCollector</item>
+                <item name="upload_endpoint" xsi:type="object">Byte8\Pulsar\Model\Collector\UploadEndpointCollector</item>
             </argument>
         </arguments>
     </type>

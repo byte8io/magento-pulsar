@@ -25,6 +25,9 @@
                 <integrations_enabled>1</integrations_enabled>
                 <phpfpm_enabled>0</phpfpm_enabled>
                 <phpfpm_status_url>http://localhost/status?json</phpfpm_status_url>
+                <media_integrity_enabled>1</media_integrity_enabled>
+                <upload_endpoint_enabled>1</upload_endpoint_enabled>
+                <upload_endpoint_log_path/>
             </checks>
         </byte8_pulsar>
     </default>
