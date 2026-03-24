@@ -17,6 +17,12 @@ class UploadEndpointCollector implements CollectorInterface
         '/customer/file/upload',
         '/checkout/cart/updateItemOptions',
         '/contact/index/post',
+        // REST API endpoints used in polyshell attacks via custom options file upload.
+        // Attackers create guest carts and add items with file custom options
+        // to upload webshells to pub/media/custom_options/quote/.
+        '/rest/V1/guest-carts',
+        '/rest/all/V1/guest-carts',
+        '/rest/default/V1/guest-carts',
     ];
 
     /**

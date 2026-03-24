@@ -125,6 +125,11 @@
                         <field id="upload_endpoint_enabled">1</field>
                     </depends>
                 </field>
+                <field id="database_size_enabled" translate="label comment" type="select" sortOrder="190" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Database Size Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Monitor total database size and largest tables. Results are cached for 24 hours.</comment>
+                </field>
             </group>
         </section>
     </system>
