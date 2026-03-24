@@ -1,6 +1,7 @@
 {
     "name": "byte8/module-pulsar",
     "description": "Pulsar Health Monitoring for Magento 2 - Exposes internal health metrics to Pulsar monitoring service",
+    "version": "1.8.0",
     "type": "magento2-module",
     "license": "proprietary",
     "require": {

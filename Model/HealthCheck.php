@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Byte8\Pulsar\Model;
 
 use Byte8\Pulsar\Model\Collector\CollectorInterface;
+use Magento\Framework\Component\ComponentRegistrar;
 use Psr\Log\LoggerInterface;
 
 class HealthCheck
 {
-    private const MODULE_VERSION = '1.8.0';
+    private const MODULE_NAME = 'Byte8_Pulsar';
+    private const VERSION_FALLBACK = 'unknown';
 
     /**
      * Tier 1: Site-critical collectors. A critical status here means the
@@ -25,12 +27,15 @@ class HealthCheck
         'phpfpm',
     ];
 
+    private ?string $resolvedVersion = null;
+
     /**
      * @param CollectorInterface[] $collectors
      */
     public function __construct(
         private readonly Config $config,
         private readonly LoggerInterface $logger,
+        private readonly ComponentRegistrar $componentRegistrar,
         private readonly array $collectors = []
     ) {
     }
@@ -83,7 +88,7 @@ class HealthCheck
         return [
             'status' => $overallStatus,
             'timestamp' => (new \DateTime())->format(\DateTime::ATOM),
-            'version' => self::MODULE_VERSION,
+            'version' => $this->getModuleVersion(),
             'checks' => $checks,
         ];
     }
@@ -108,5 +113,43 @@ class HealthCheck
         }
 
         return $status;
+    }
+
+    /**
+     * Read module version from composer.json (cached for the request lifetime).
+     */
+    private function getModuleVersion(): string
+    {
+        if ($this->resolvedVersion !== null) {
+            return $this->resolvedVersion;
+        }
+
+        $this->resolvedVersion = self::VERSION_FALLBACK;
+
+        $modulePath = $this->componentRegistrar->getPath(
+            ComponentRegistrar::MODULE,
+            self::MODULE_NAME
+        );
+
+        if ($modulePath === null) {
+            return $this->resolvedVersion;
+        }
+
+        $composerFile = $modulePath . '/composer.json';
+        if (!file_exists($composerFile)) {
+            return $this->resolvedVersion;
+        }
+
+        $content = @file_get_contents($composerFile);
+        if ($content === false) {
+            return $this->resolvedVersion;
+        }
+
+        $data = json_decode($content, true);
+        if (is_array($data) && isset($data['version']) && is_string($data['version'])) {
+            $this->resolvedVersion = $data['version'];
+        }
+
+        return $this->resolvedVersion;
     }
 }
