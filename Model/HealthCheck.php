@@ -9,7 +9,7 @@ use Psr\Log\LoggerInterface;
 
 class HealthCheck
 {
-    private const MODULE_VERSION = '1.5.0';
+    private const MODULE_VERSION = '1.8.0';
 
     /**
      * Tier 1: Site-critical collectors. A critical status here means the
