@@ -142,6 +142,8 @@ class MediaIntegrityCollector implements CollectorInterface
             'executable_files_found' => $executableCount,
             'polyshell_files_found' => $polyshellCount,
             'htaccess_issues' => count($htaccessIssues),
+            'htaccess_skipped' => $this->isNginx(),
+            'web_server' => $this->isNginx() ? 'nginx' : 'apache',
             'monitored_directories' => $subdirCounts,
         ];
 
@@ -354,16 +356,33 @@ class MediaIntegrityCollector implements CollectorInterface
     }
 
     /**
+     * Detect whether the server is running Nginx (htaccess is Apache-only).
+     */
+    private function isNginx(): bool
+    {
+        $serverSoftware = $_SERVER['SERVER_SOFTWARE'] ?? '';
+
+        return stripos($serverSoftware, 'nginx') !== false;
+    }
+
+    /**
      * Verify .htaccess files exist in pub/media/ and subdirectories
      * and contain rules that block PHP execution.
      *
      * Missing or empty .htaccess files mean webshells could execute
      * on Apache — this is the last line of defense.
+     * Skipped on Nginx where .htaccess files are not used.
      *
      * @return list<string> Issues found (empty = all OK)
      */
     private function checkHtaccessFiles(string $mediaDir): array
     {
+        // Nginx does not process .htaccess files — PHP execution is controlled
+        // via the server block config (e.g. location ~* \.php$ { deny all; })
+        if ($this->isNginx()) {
+            return [];
+        }
+
         $issues = [];
 
         foreach (self::HTACCESS_PATHS as $subdir) {
@@ -386,13 +405,14 @@ class MediaIntegrityCollector implements CollectorInterface
 
             // Check for PHP execution deny rules
             // Common patterns: "Require all denied", "deny from all",
-            // "php_flag engine off", "SetHandler none", "RemoveHandler .php"
+            // "php_flag engine off/0", "SetHandler none", "RemoveHandler .php"
             $lower = strtolower($content);
             $hasProtection = str_contains($lower, 'require all denied')
                 || str_contains($lower, 'deny from all')
-                || str_contains($lower, 'php_flag engine off')
+                || (bool) preg_match('/php_flag\s+engine\s+(off|0)\b/i', $content)
                 || str_contains($lower, 'removehandler')
-                || str_contains($lower, 'sethandler none');
+                || str_contains($lower, 'sethandler none')
+                || str_contains($lower, 'sethandler default-handler');
 
             if (!$hasProtection) {
                 $issues[] = $label . ' lacks PHP execution deny rules';
