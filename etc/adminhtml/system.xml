@@ -26,6 +26,22 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Check cron job health and stuck jobs</comment>
                 </field>
+                <field id="cron_pending_warning" translate="label comment" type="text" sortOrder="11" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Cron Pending Jobs Warning Threshold</label>
+                    <comment>Number of overdue pending jobs before status becomes degraded (default: 200). Increase for busy stores with frequent imports.</comment>
+                    <validate>validate-digits</validate>
+                    <depends>
+                        <field id="cron_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="cron_failed_warning" translate="label comment" type="text" sortOrder="12" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Cron Failed Jobs Warning Threshold (24h)</label>
+                    <comment>Number of failed cron jobs in 24 hours before status becomes degraded (default: 5)</comment>
+                    <validate>validate-digits</validate>
+                    <depends>
+                        <field id="cron_enabled">1</field>
+                    </depends>
+                </field>
                 <field id="indexer_enabled" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Indexer Status</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>

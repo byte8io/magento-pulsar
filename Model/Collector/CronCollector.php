@@ -6,14 +6,18 @@ namespace Byte8\Pulsar\Model\Collector;
 
 use Magento\Cron\Model\ResourceModel\Schedule\CollectionFactory as ScheduleCollectionFactory;
 use Magento\Cron\Model\Schedule;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 
 class CronCollector implements CollectorInterface
 {
     private const STUCK_THRESHOLD_MINUTES = 60;
     private const HEARTBEAT_THRESHOLD_MINUTES = 15;
+    private const DEFAULT_PENDING_WARNING = 200;
+    private const DEFAULT_FAILED_WARNING = 5;
 
     public function __construct(
-        private readonly ScheduleCollectionFactory $scheduleCollectionFactory
+        private readonly ScheduleCollectionFactory $scheduleCollectionFactory,
+        private readonly ScopeConfigInterface $scopeConfig
     ) {
     }
 
@@ -28,6 +32,10 @@ class CronCollector implements CollectorInterface
         $oneDayAgo = (new \DateTime())->modify('-24 hours');
         $stuckThreshold = (new \DateTime())->modify(sprintf('-%d minutes', self::STUCK_THRESHOLD_MINUTES));
         $heartbeatThreshold = (new \DateTime())->modify(sprintf('-%d minutes', self::HEARTBEAT_THRESHOLD_MINUTES));
+
+        // Read configurable thresholds (fallback to defaults)
+        $pendingWarning = (int) ($this->scopeConfig->getValue('byte8_pulsar/checks/cron_pending_warning') ?: self::DEFAULT_PENDING_WARNING);
+        $failedWarning = (int) ($this->scopeConfig->getValue('byte8_pulsar/checks/cron_failed_warning') ?: self::DEFAULT_FAILED_WARNING);
 
         // Heartbeat: is cron:run still scheduling new jobs?
         $latestScheduled = $this->scheduleCollectionFactory->create()
@@ -72,7 +80,7 @@ class CronCollector implements CollectorInterface
         $status = self::STATUS_HEALTHY;
         if (!$heartbeatAlive || $stuckJobs > 0 || $lastRunAt === null) {
             $status = self::STATUS_CRITICAL;
-        } elseif ($failedJobs > 5 || $pendingJobs > 200) {
+        } elseif ($failedJobs > $failedWarning || $pendingJobs > $pendingWarning) {
             $status = self::STATUS_DEGRADED;
         }
 
