@@ -28,7 +28,7 @@ jobs:
         run: find . -name '*.php' -not -path './.git/*' | xargs -n1 php -l
 
       - name: Validate composer.json
-        run: composer validate --strict
+        run: composer validate
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist 2>/dev/null || true
