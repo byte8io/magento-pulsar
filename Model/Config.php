@@ -30,6 +30,7 @@ class Config
     private const XML_PATH_MEDIA_INTEGRITY_ENABLED = 'byte8_pulsar/checks/media_integrity_enabled';
     private const XML_PATH_UPLOAD_ENDPOINT_ENABLED = 'byte8_pulsar/checks/upload_endpoint_enabled';
     private const XML_PATH_DATABASE_SIZE_ENABLED = 'byte8_pulsar/checks/database_size_enabled';
+    private const XML_PATH_LOG_ERRORS_ENABLED = 'byte8_pulsar/checks/log_errors_enabled';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -146,6 +147,11 @@ class Config
         return $this->scopeConfig->isSetFlag(self::XML_PATH_DATABASE_SIZE_ENABLED);
     }
 
+    public function isLogErrorsCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_LOG_ERRORS_ENABLED);
+    }
+
     public function isCheckEnabled(string $checkName): bool
     {
         return match ($checkName) {
@@ -168,6 +174,7 @@ class Config
             'media_integrity' => $this->isMediaIntegrityCheckEnabled(),
             'upload_endpoint' => $this->isUploadEndpointCheckEnabled(),
             'database_size' => $this->isDatabaseSizeCheckEnabled(),
+            'log_errors' => $this->isLogErrorsCheckEnabled(),
             default => false,
         };
     }

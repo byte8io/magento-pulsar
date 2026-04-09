@@ -146,6 +146,11 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Monitor total database size and largest tables. Results are cached for 24 hours.</comment>
                 </field>
+                <field id="log_errors_enabled" translate="label comment" type="select" sortOrder="200" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Log Error Monitoring</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Parse exception.log and system.log for CRITICAL/ERROR entries and report unique error signatures. Uses incremental reading (only new content since last check).</comment>
+                </field>
             </group>
         </section>
     </system>

@@ -29,6 +29,7 @@
                 <upload_endpoint_enabled>1</upload_endpoint_enabled>
                 <upload_endpoint_log_path/>
                 <database_size_enabled>1</database_size_enabled>
+                <log_errors_enabled>1</log_errors_enabled>
             </checks>
         </byte8_pulsar>
     </default>

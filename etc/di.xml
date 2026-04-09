@@ -25,6 +25,7 @@
                 <item name="media_integrity" xsi:type="object">Byte8\Pulsar\Model\Collector\MediaIntegrityCollector</item>
                 <item name="upload_endpoint" xsi:type="object">Byte8\Pulsar\Model\Collector\UploadEndpointCollector</item>
                 <item name="database_size" xsi:type="object">Byte8\Pulsar\Model\Collector\DatabaseSizeCollector</item>
+                <item name="log_errors" xsi:type="object">Byte8\Pulsar\Model\Collector\LogErrorCollector</item>
             </argument>
         </arguments>
     </type>
