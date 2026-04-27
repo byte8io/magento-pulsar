@@ -4,13 +4,7 @@
     <acl>
         <resources>
             <resource id="Magento_Backend::admin">
-                <resource id="Magento_Backend::stores">
-                    <resource id="Magento_Backend::stores_settings">
-                        <resource id="Magento_Config::config">
-                            <resource id="Byte8_Pulsar::config" title="Pulsar Health Monitoring" sortOrder="10"/>
-                        </resource>
-                    </resource>
-                </resource>
+                <resource id="Byte8_Pulsar::config" title="Pulsar Health Monitoring" sortOrder="10"/>
             </resource>
         </resources>
     </acl>
