@@ -4,7 +4,7 @@
     <system>
         <section id="byte8_pulsar" translate="label" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
             <label>Pulsar Health Monitoring</label>
-            <tab>byte8</tab>
+            <tab>byte8_tab</tab>
             <resource>Byte8_Pulsar::config</resource>
             <group id="general" translate="label" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
                 <label>General Settings</label>
