@@ -151,6 +151,18 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Parse exception.log and system.log for CRITICAL/ERROR entries and report unique error signatures. Uses incremental reading (only new content since last check).</comment>
                 </field>
+                <field id="content_integrity_enabled" translate="label comment" type="select" sortOrder="210" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Content Integrity Status</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Scan core_config_data head/footer HTML and CMS block/page content (all scopes) for injected skimmer / obfuscated JavaScript. Flags a compromise distinct from downtime.</comment>
+                </field>
+                <field id="content_integrity_script_allowlist" translate="label comment" type="textarea" sortOrder="211" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Trusted Script Hosts</label>
+                    <comment>Extra hostnames allowed in &lt;script src&gt; within stored content (comma or newline separated), beyond the built-in list and your store's own domain. An unrecognized external script is reported for review, not flagged as compromised.</comment>
+                    <depends>
+                        <field id="content_integrity_enabled">1</field>
+                    </depends>
+                </field>
             </group>
         </section>
     </system>

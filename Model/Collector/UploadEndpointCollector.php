@@ -125,7 +125,13 @@ class UploadEndpointCollector implements CollectorInterface
         if ($totalScripted >= self::SCRIPTED_CRITICAL_THRESHOLD
             || $totalUploads >= self::POST_CRITICAL_THRESHOLD
         ) {
-            $status = self::STATUS_CRITICAL;
+            // A sustained scripted POST flood against file-upload endpoints is
+            // the active phase of a polyshell/webshell drop (MediaIntegrity
+            // detects the on-disk result). Surfaced as a security compromise
+            // event, not a plain operational critical. The milder DEGRADED level
+            // below stays operational so routine bot-probing of upload endpoints
+            // does not raise a "compromised" badge.
+            $status = self::STATUS_COMPROMISED;
         } elseif ($totalScripted >= self::SCRIPTED_WARNING_THRESHOLD
             || $totalUploads >= self::POST_WARNING_THRESHOLD
         ) {

@@ -30,6 +30,8 @@
                 <upload_endpoint_log_path/>
                 <database_size_enabled>1</database_size_enabled>
                 <log_errors_enabled>1</log_errors_enabled>
+                <content_integrity_enabled>1</content_integrity_enabled>
+                <content_integrity_script_allowlist/>
             </checks>
         </byte8_pulsar>
     </default>

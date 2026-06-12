@@ -31,6 +31,8 @@ class Config
     private const XML_PATH_UPLOAD_ENDPOINT_ENABLED = 'byte8_pulsar/checks/upload_endpoint_enabled';
     private const XML_PATH_DATABASE_SIZE_ENABLED = 'byte8_pulsar/checks/database_size_enabled';
     private const XML_PATH_LOG_ERRORS_ENABLED = 'byte8_pulsar/checks/log_errors_enabled';
+    private const XML_PATH_CONTENT_INTEGRITY_ENABLED = 'byte8_pulsar/checks/content_integrity_enabled';
+    private const XML_PATH_CONTENT_INTEGRITY_ALLOWLIST = 'byte8_pulsar/checks/content_integrity_script_allowlist';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -152,6 +154,22 @@ class Config
         return $this->scopeConfig->isSetFlag(self::XML_PATH_LOG_ERRORS_ENABLED);
     }
 
+    public function isContentIntegrityCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_CONTENT_INTEGRITY_ENABLED);
+    }
+
+    /**
+     * Comma/newline-separated extra hostnames the operator trusts to appear in
+     * <script src> within stored content (beyond the built-in allowlist).
+     *
+     * @return string Raw configured value ('' if unset)
+     */
+    public function getContentIntegrityScriptAllowlist(): string
+    {
+        return (string) $this->scopeConfig->getValue(self::XML_PATH_CONTENT_INTEGRITY_ALLOWLIST);
+    }
+
     public function isCheckEnabled(string $checkName): bool
     {
         return match ($checkName) {
@@ -175,6 +193,7 @@ class Config
             'upload_endpoint' => $this->isUploadEndpointCheckEnabled(),
             'database_size' => $this->isDatabaseSizeCheckEnabled(),
             'log_errors' => $this->isLogErrorsCheckEnabled(),
+            'content_integrity' => $this->isContentIntegrityCheckEnabled(),
             default => false,
         };
     }

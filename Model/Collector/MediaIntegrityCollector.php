@@ -182,20 +182,31 @@ class MediaIntegrityCollector implements CollectorInterface
         $executableCount = count($suspiciousFiles);
         $polyshellCount = count($polyshellFiles);
 
-        if ($executableCount > 0 || $polyshellCount > 0 || !empty($htaccessIssues)) {
+        // Active tamper evidence — a PHP-executable file or an image with an
+        // embedded PHP payload in pub/media/ — is a compromise, not a mere
+        // operational critical. Surfaced as a security event, separate from uptime.
+        if ($executableCount > 0 || $polyshellCount > 0) {
+            $status = self::STATUS_COMPROMISED;
+        } elseif (!empty($htaccessIssues)) {
+            // A missing/weak PHP-execution guard is a hardening gap (webshells
+            // *could* run) — a vulnerability, not proof of an actual breach.
             $status = self::STATUS_CRITICAL;
         }
 
-        // Escalate based on per-subdir thresholds against UNEXPECTED file counts
-        foreach ($subdirReports as $report) {
-            if ($report['status'] === self::STATUS_CRITICAL) {
-                $status = self::STATUS_CRITICAL;
-                break;
-            }
-            if ($report['status'] === self::STATUS_DEGRADED
-                && $status === self::STATUS_HEALTHY
-            ) {
-                $status = self::STATUS_DEGRADED;
+        // Per-subdir volume thresholds are operational (legitimate bulk uploads
+        // can trip them): they escalate up to CRITICAL but must never downgrade
+        // an already-detected COMPROMISED status.
+        if ($status !== self::STATUS_COMPROMISED) {
+            foreach ($subdirReports as $report) {
+                if ($report['status'] === self::STATUS_CRITICAL) {
+                    $status = self::STATUS_CRITICAL;
+                    break;
+                }
+                if ($report['status'] === self::STATUS_DEGRADED
+                    && $status === self::STATUS_HEALTHY
+                ) {
+                    $status = self::STATUS_DEGRADED;
+                }
             }
         }
 

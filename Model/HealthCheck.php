@@ -48,6 +48,11 @@ class HealthCheck
             CollectorInterface::STATUS_HEALTHY => 0,
             CollectorInterface::STATUS_DEGRADED => 1,
             CollectorInterface::STATUS_CRITICAL => 2,
+            // Highest: a security compromise must win the overall rollup so it is
+            // never hidden behind an unrelated operational issue. It is *not*
+            // STATUS_CRITICAL, so the Tier-2 cap in getEffectiveStatus() leaves it
+            // uncapped regardless of which collector raised it.
+            CollectorInterface::STATUS_COMPROMISED => 3,
         ];
 
         foreach ($this->collectors as $name => $collector) {
