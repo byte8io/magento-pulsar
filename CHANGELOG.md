@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/byte8io/magento-pulsar/compare/v1.10.1...v1.11.0) (2026-06-15)
+
+
+### Features
+
+* add ContentIntegrityCollector + compromised status ([8c6723e](https://github.com/byte8io/magento-pulsar/commit/8c6723ec513f0e2b8cb94cef3a8b72e754c01e88))
+
 ## [1.10.1](https://github.com/byte8io/magento-pulsar/compare/v1.10.0...v1.10.1) (2026-05-04)
 
 
