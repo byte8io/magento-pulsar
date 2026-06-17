@@ -45,15 +45,35 @@ class QueueCollector implements CollectorInterface
                 ];
             }
 
-            // Count messages by status in a single query
+            // Count messages by status in a single query.
+            // pending / in_progress are point-in-time backlog (NOT windowed): a
+            // message stuck for days is more concerning, not less.
             $sql = sprintf('SELECT status, COUNT(*) as cnt FROM %s GROUP BY status', $statusTable);
             $rows = $connection->fetchPairs($sql);
 
             $pending = (int) ($rows[self::MSG_STATUS_NEW] ?? 0)
                 + (int) ($rows[self::MSG_STATUS_RETRY_REQUIRED] ?? 0);
             $inProgress = (int) ($rows[self::MSG_STATUS_IN_PROGRESS] ?? 0);
-            $errors = (int) ($rows[self::MSG_STATUS_ERROR] ?? 0);
-            $completed = (int) ($rows[self::MSG_STATUS_COMPLETE] ?? 0);
+            $errorsTotal = (int) ($rows[self::MSG_STATUS_ERROR] ?? 0);
+            $completedTotal = (int) ($rows[self::MSG_STATUS_COMPLETE] ?? 0);
+
+            // Cumulative-event metrics ARE windowed to the last 24h. ERROR rows
+            // are retained by Magento's queue cleanup (unlike COMPLETE/NEW), so an
+            // all-time count never recovers and pins the collector at "degraded"
+            // forever after a single past incident. updated_at advances on each
+            // status transition, so it reliably dates the error.
+            $windowed = $connection->fetchRow(sprintf(
+                'SELECT'
+                . ' SUM(CASE WHEN status = %1$d THEN 1 ELSE 0 END) AS errors_24h,'
+                . ' SUM(CASE WHEN status = %2$d THEN 1 ELSE 0 END) AS completed_24h'
+                . ' FROM %3$s'
+                . ' WHERE updated_at >= (NOW() - INTERVAL 24 HOUR)',
+                self::MSG_STATUS_ERROR,
+                self::MSG_STATUS_COMPLETE,
+                $statusTable
+            ));
+            $errors24h = (int) ($windowed['errors_24h'] ?? 0);
+            $completed24h = (int) ($windowed['completed_24h'] ?? 0);
 
             // Find the oldest unprocessed message to measure queue age
             $oldestPending = $connection->fetchOne(sprintf(
@@ -64,11 +84,20 @@ class QueueCollector implements CollectorInterface
                 self::MSG_STATUS_RETRY_REQUIRED
             ));
 
-            // Determine status
+            // Determine status from the windowed error rate and current backlog.
             $status = self::STATUS_HEALTHY;
-            if ($pending > self::PENDING_CRITICAL_THRESHOLD || $errors > self::ERROR_CRITICAL_THRESHOLD) {
+            if ($pending > self::PENDING_CRITICAL_THRESHOLD || $errors24h > self::ERROR_CRITICAL_THRESHOLD) {
                 $status = self::STATUS_CRITICAL;
-            } elseif ($pending > self::PENDING_WARNING_THRESHOLD || $errors > self::ERROR_WARNING_THRESHOLD) {
+            } elseif ($pending > self::PENDING_WARNING_THRESHOLD || $errors24h > self::ERROR_WARNING_THRESHOLD) {
+                $status = self::STATUS_DEGRADED;
+            }
+
+            // Dead-consumer heuristic: messages are waiting but nothing has
+            // completed or is in progress in the last 24h => consumers likely
+            // not running. Rising pending alone can't distinguish "slow" from
+            // "stopped"; zero throughput confirms "stopped".
+            $consumersStalled = $pending > 0 && $completed24h === 0 && $inProgress === 0;
+            if ($consumersStalled && $status === self::STATUS_HEALTHY) {
                 $status = self::STATUS_DEGRADED;
             }
 
@@ -77,8 +106,11 @@ class QueueCollector implements CollectorInterface
                 'backend' => 'mysql',
                 'pending' => $pending,
                 'in_progress' => $inProgress,
-                'errors' => $errors,
-                'completed' => $completed,
+                'errors_24h' => $errors24h,         // windowed — drives status
+                'errors_total' => $errorsTotal,     // all-time, context only
+                'completed_24h' => $completed24h,   // throughput / dead-consumer signal
+                'completed' => $completedTotal,
+                'consumers_stalled' => $consumersStalled,
                 'oldest_pending' => $oldestPending ?: null,
             ];
         } catch (\Exception $e) {
