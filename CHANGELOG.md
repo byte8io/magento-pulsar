@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/byte8io/magento-pulsar/compare/v1.11.0...v1.12.0) (2026-06-17)
+
+
+### Features
+
+* window queue errors to 24h + dead-consumer signal ([fd197ca](https://github.com/byte8io/magento-pulsar/commit/fd197ca6a6c345b8450e5f07c8f0a40c393486c5))
+
 ## [1.11.0](https://github.com/byte8io/magento-pulsar/compare/v1.10.1...v1.11.0) (2026-06-15)
 
 
