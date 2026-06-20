@@ -51,18 +51,35 @@ class ContentIntegrityCollector implements CollectorInterface
      * obfuscation) is reported as DEGRADED for review, never COMPROMISED.
      */
     private const DEFAULT_SCRIPT_ALLOWLIST = [
+        // Google stack
         'googletagmanager.com',
         'google-analytics.com',
         'googletagservices.com',
         'google.com',
         'gstatic.com',
         'youtube.com',
+        'recaptcha.net',
+        // Consent / cookie management
         'consentmanager.net',
         'cookiebot.com',
+        // CDNs
         'jquery.com',
         'jsdelivr.net',
         'cloudflare.com',
-        'recaptcha.net',
+        // Payments (official SDK / button hosts loaded at checkout)
+        'paypal.com',
+        'paypalobjects.com',
+        'klarna.com',
+        'stripe.com',
+        // Trust badges & reviews
+        'trustedshops.com',
+        'trustpilot.com',
+        // Social sharing & marketing pixels
+        'addthis.com',
+        'facebook.net',
+        // Product analytics / session replay
+        'hotjar.com',
+        'clarity.ms',
     ];
 
     /** Cap CMS rows scanned per table; truncation is reported, never silent. */
