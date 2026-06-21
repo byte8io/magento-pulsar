@@ -22,12 +22,20 @@ use Magento\Framework\App\ResourceConnection;
  * collapses scopes and would hide a per-store/per-website injection).
  *
  * Detection is behaviour-based, not domain-based (incident lesson #6): one
- * payload pointed at tracktagapi.com, a second at api.tracktagcenter.com, so we
- * match the obfuscation technique (char-code/hex encoding, obfuscator hex vars,
- * dynamic import) rather than a hostname. Substring matching is done in PHP on
- * full values (incident lessons #4 — `LIKE '%_0x%'` mis-fires because `_` is a
- * SQL wildcard — and #5 — payloads sit *after* legit content, so never truncate
+ * payload pointed at one exfil domain, a second at another, so we match the
+ * obfuscation technique (char-code/hex encoding, obfuscator hex vars, dynamic
+ * import) rather than a hostname. Substring matching is done in PHP on full
+ * values (incident lessons #4 — `LIKE '%_0x%'` mis-fires because `_` is a SQL
+ * wildcard — and #5 — payloads sit *after* legit content, so never truncate
  * before scanning).
+ *
+ * NOTE: do NOT write live IOC hostnames as literal strings anywhere in this
+ * module. External malware scanners (e.g. maxcluster) match their own IOC
+ * database against our source and will flag this file as "suspicious" on a bare
+ * exfil domain — a false positive on a security extension. The two domains from
+ * the original incident were `tracktagapi[.]com` and `api[.]tracktagcenter[.]com`
+ * (defanged on purpose). If real domain-based detection is ever added, store the
+ * IOCs base64/rot13-encoded and decode at runtime so no live IOC literal ships.
  */
 class ContentIntegrityCollector implements CollectorInterface
 {
@@ -133,8 +141,7 @@ class ContentIntegrityCollector implements CollectorInterface
                 'status' => $status,
                 'findings_total' => count($findings),
                 'findings' => array_slice($findings, 0, self::MAX_FINDINGS_REPORTED),
-                'findings_truncated' =>
-                    $truncated || count($findings) > self::MAX_FINDINGS_REPORTED,
+                'findings_truncated' => $truncated || count($findings) > self::MAX_FINDINGS_REPORTED,
                 'cms_scan_capped' => $cmsTruncated,
             ];
         } catch (\Exception $e) {
