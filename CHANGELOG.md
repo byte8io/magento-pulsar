@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.1](https://github.com/byte8io/magento-pulsar/compare/v1.12.0...v1.12.1) (2026-06-21)
+
+
+### Bug Fixes
+
+* allowlist common third-party script hosts in content_integrity ([7ad6d76](https://github.com/byte8io/magento-pulsar/commit/7ad6d7650e64fd851818008b7e6f89d1c5bb667e))
+* defang literal IOC domains in content_integrity to stop AV false positives ([36eeeac](https://github.com/byte8io/magento-pulsar/commit/36eeeac20d6a815447d386ce59f5b5c1fc3c54c7))
+
 ## [1.12.0](https://github.com/byte8io/magento-pulsar/compare/v1.11.0...v1.12.0) (2026-06-17)
 
 
