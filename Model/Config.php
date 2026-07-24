@@ -33,6 +33,7 @@ class Config
     private const XML_PATH_LOG_ERRORS_ENABLED = 'byte8_pulsar/checks/log_errors_enabled';
     private const XML_PATH_CONTENT_INTEGRITY_ENABLED = 'byte8_pulsar/checks/content_integrity_enabled';
     private const XML_PATH_CONTENT_INTEGRITY_ALLOWLIST = 'byte8_pulsar/checks/content_integrity_script_allowlist';
+    private const XML_PATH_TRANSACTIONAL_EMAIL_ENABLED = 'byte8_pulsar/checks/transactional_email_enabled';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -170,6 +171,11 @@ class Config
         return (string) $this->scopeConfig->getValue(self::XML_PATH_CONTENT_INTEGRITY_ALLOWLIST);
     }
 
+    public function isTransactionalEmailCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_TRANSACTIONAL_EMAIL_ENABLED);
+    }
+
     public function isCheckEnabled(string $checkName): bool
     {
         return match ($checkName) {
@@ -194,6 +200,7 @@ class Config
             'database_size' => $this->isDatabaseSizeCheckEnabled(),
             'log_errors' => $this->isLogErrorsCheckEnabled(),
             'content_integrity' => $this->isContentIntegrityCheckEnabled(),
+            'transactional_email' => $this->isTransactionalEmailCheckEnabled(),
             default => false,
         };
     }

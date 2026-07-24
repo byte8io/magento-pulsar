@@ -163,6 +163,11 @@
                         <field id="content_integrity_enabled">1</field>
                     </depends>
                 </field>
+                <field id="transactional_email_enabled" translate="label comment" type="select" sortOrder="220" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Transactional Email Monitoring</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Detect sales confirmation emails (order/invoice/shipment/creditmemo) that were never sent: permanently lost sends (email_sent NULL after a failed synchronous send — Magento never retries these) and stuck async retry backlogs (email_sent 0 older than the send cron should allow).</comment>
+                </field>
             </group>
         </section>
     </system>

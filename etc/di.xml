@@ -27,6 +27,7 @@
                 <item name="database_size" xsi:type="object">Byte8\Pulsar\Model\Collector\DatabaseSizeCollector</item>
                 <item name="log_errors" xsi:type="object">Byte8\Pulsar\Model\Collector\LogErrorCollector</item>
                 <item name="content_integrity" xsi:type="object">Byte8\Pulsar\Model\Collector\ContentIntegrityCollector</item>
+                <item name="transactional_email" xsi:type="object">Byte8\Pulsar\Model\Collector\TransactionalEmailCollector</item>
             </argument>
         </arguments>
     </type>

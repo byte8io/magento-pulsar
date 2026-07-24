@@ -390,6 +390,31 @@ Monitors third-party integration health and OAuth token status.
 
 ---
 
+### Transactional Email
+
+Detects sales confirmation emails (order, invoice, shipment, creditmemo) that were requested but never handed to the mail transport. Looks at a trailing 48-hour window, ignoring entities younger than 30 minutes so in-flight async sends are never flagged.
+
+| Metric | Description |
+|--------|-------------|
+| `order_unsent` | Orders with `send_email = 1` and `email_sent IS NULL` (permanently lost) |
+| `invoice_unsent` | Same for invoices |
+| `shipment_unsent` | Same for shipments |
+| `creditmemo_unsent` | Same for credit memos |
+| `pending_retry` | Entities queued for the async send cron (`email_sent = 0`) past the grace period |
+| `oldest_unsent_minutes` | Age of the oldest unsent/pending entity in the window |
+| `async_enabled` | Value of `sales_email/general/async_sending` |
+| `sample_increment_ids` | Up to 10 order increment IDs with lost confirmations (newest first), for manual resend |
+
+**Status:**
+- Critical: ≥ 5 permanently lost emails, or an async retry backlog stuck > 2 hours
+- Degraded: any permanently lost email, or an async backlog waiting > 30 minutes
+
+**Why it matters:** When emails are sent synchronously (`async_sending` off) and the SMTP server times out during checkout, the exception is thrown *after* the order is saved — `email_sent` stays `NULL`. Magento's retry cron only re-sends `email_sent = 0`, so `NULL` rows are invisible to it: the confirmation is silently lost for good, and nobody notices until a customer complains weeks later. The collector distinguishes these permanent losses from a normal async retry backlog, and escalates harder when the async safety net is off.
+
+**Edge cases:** Canceled orders are excluded (they legitimately get no confirmation). Missing sales tables report zero. Rows older than the 48-hour window age out so a handled incident doesn't pin the collector red.
+
+---
+
 ## Architecture
 
 ```

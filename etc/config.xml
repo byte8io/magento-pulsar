@@ -32,6 +32,7 @@
                 <log_errors_enabled>1</log_errors_enabled>
                 <content_integrity_enabled>1</content_integrity_enabled>
                 <content_integrity_script_allowlist/>
+                <transactional_email_enabled>1</transactional_email_enabled>
             </checks>
         </byte8_pulsar>
     </default>
