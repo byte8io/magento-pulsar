@@ -28,6 +28,7 @@
                 <item name="log_errors" xsi:type="object">Byte8\Pulsar\Model\Collector\LogErrorCollector</item>
                 <item name="content_integrity" xsi:type="object">Byte8\Pulsar\Model\Collector\ContentIntegrityCollector</item>
                 <item name="transactional_email" xsi:type="object">Byte8\Pulsar\Model\Collector\TransactionalEmailCollector</item>
+                <item name="applied_patches" xsi:type="object">Byte8\Pulsar\Model\Collector\AppliedPatchesCollector</item>
             </argument>
         </arguments>
     </type>

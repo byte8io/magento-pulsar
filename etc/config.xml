@@ -33,6 +33,9 @@
                 <content_integrity_enabled>1</content_integrity_enabled>
                 <content_integrity_script_allowlist/>
                 <transactional_email_enabled>1</transactional_email_enabled>
+                <applied_patches_enabled>1</applied_patches_enabled>
+                <applied_patches_dirs/>
+                <applied_patches_sources>composer_json,installed_json,patch_dirs</applied_patches_sources>
             </checks>
         </byte8_pulsar>
     </default>

@@ -168,6 +168,26 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Detect sales confirmation emails (order/invoice/shipment/creditmemo) that were never sent: permanently lost sends (email_sent NULL after a failed synchronous send — Magento never retries these) and stuck async retry backlogs (email_sent 0 older than the send cron should allow).</comment>
                 </field>
+                <field id="applied_patches_enabled" translate="label comment" type="select" sortOrder="230" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Applied Security Patches</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Inventory security patches applied to this store (composer patches, git apply, archived .patch files) and verify each is still present in the live code. Pulsar uses this to suppress security advisories for CVEs you have already patched, and alerts if an applied patch disappears (e.g. wiped by a composer install).</comment>
+                </field>
+                <field id="applied_patches_sources" translate="label comment" type="multiselect" sortOrder="231" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Patch Detection Mechanisms</label>
+                    <source_model>Byte8\Pulsar\Model\Config\Source\PatchSources</source_model>
+                    <comment>Which mechanisms to read for applied patches. Leave all selected unless a source produces noise for your setup.</comment>
+                    <depends>
+                        <field id="applied_patches_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="applied_patches_dirs" translate="label comment" type="textarea" sortOrder="232" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Patch Directories</label>
+                    <comment>Directories containing archived .patch/.diff files, relative to the Magento root (comma or newline separated). Leave empty to use the default: patches/</comment>
+                    <depends>
+                        <field id="applied_patches_enabled">1</field>
+                    </depends>
+                </field>
             </group>
         </section>
     </system>

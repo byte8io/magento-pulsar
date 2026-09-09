@@ -34,6 +34,12 @@ class Config
     private const XML_PATH_CONTENT_INTEGRITY_ENABLED = 'byte8_pulsar/checks/content_integrity_enabled';
     private const XML_PATH_CONTENT_INTEGRITY_ALLOWLIST = 'byte8_pulsar/checks/content_integrity_script_allowlist';
     private const XML_PATH_TRANSACTIONAL_EMAIL_ENABLED = 'byte8_pulsar/checks/transactional_email_enabled';
+    private const XML_PATH_APPLIED_PATCHES_ENABLED = 'byte8_pulsar/checks/applied_patches_enabled';
+    private const XML_PATH_APPLIED_PATCHES_DIRS = 'byte8_pulsar/checks/applied_patches_dirs';
+    private const XML_PATH_APPLIED_PATCHES_SOURCES = 'byte8_pulsar/checks/applied_patches_sources';
+
+    private const DEFAULT_APPLIED_PATCHES_DIRS = ['patches'];
+    private const DEFAULT_APPLIED_PATCHES_SOURCES = ['composer_json', 'installed_json', 'patch_dirs'];
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -176,6 +182,41 @@ class Config
         return $this->scopeConfig->isSetFlag(self::XML_PATH_TRANSACTIONAL_EMAIL_ENABLED);
     }
 
+    public function isAppliedPatchesCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_APPLIED_PATCHES_ENABLED);
+    }
+
+    /**
+     * Directories to scan for archived .patch/.diff files, relative to the
+     * Magento root (absolute paths allowed). Comma or newline separated;
+     * defaults to the conventional patches/ directory.
+     *
+     * @return string[]
+     */
+    public function getAppliedPatchesDirs(): array
+    {
+        $raw = (string) $this->scopeConfig->getValue(self::XML_PATH_APPLIED_PATCHES_DIRS);
+        $dirs = array_values(array_filter(array_map(
+            'trim',
+            (array) preg_split('/[,\n\r]+/', $raw)
+        )));
+        return $dirs ?: self::DEFAULT_APPLIED_PATCHES_DIRS;
+    }
+
+    /**
+     * Which patch-detection mechanisms to read. Multiselect stores a
+     * comma-separated string; empty/unset means all mechanisms.
+     *
+     * @return string[]
+     */
+    public function getAppliedPatchesSources(): array
+    {
+        $raw = (string) $this->scopeConfig->getValue(self::XML_PATH_APPLIED_PATCHES_SOURCES);
+        $sources = array_values(array_filter(array_map('trim', explode(',', $raw))));
+        return $sources ?: self::DEFAULT_APPLIED_PATCHES_SOURCES;
+    }
+
     public function isCheckEnabled(string $checkName): bool
     {
         return match ($checkName) {
@@ -201,6 +242,7 @@ class Config
             'log_errors' => $this->isLogErrorsCheckEnabled(),
             'content_integrity' => $this->isContentIntegrityCheckEnabled(),
             'transactional_email' => $this->isTransactionalEmailCheckEnabled(),
+            'applied_patches' => $this->isAppliedPatchesCheckEnabled(),
             default => false,
         };
     }
