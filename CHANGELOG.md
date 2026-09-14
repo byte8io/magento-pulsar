@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.13.0](https://github.com/byte8io/magento-pulsar/compare/v1.12.1...v1.13.0) (2026-08-30)
+
+
+### Features
+
+* add transactional_email collector for unsent sales emails ([1e2b71a](https://github.com/byte8io/magento-pulsar/commit/1e2b71ab3fceaaddf479002b076a800ff9abdcc1))
+
+
+### Bug Fixes
+
+* stabilize log-error signature against embedded timestamps ([8730377](https://github.com/byte8io/magento-pulsar/commit/8730377789d91caac28e50e74fe17cfa36b66e81))
+
 ## [1.12.1](https://github.com/byte8io/magento-pulsar/compare/v1.12.0...v1.12.1) (2026-06-21)
 
 
