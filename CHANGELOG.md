@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/byte8io/magento-pulsar/compare/v1.13.0...v1.14.0) (2026-09-14)
+
+
+### Features
+
+* applied security patch inventory + verification collector ([604863d](https://github.com/byte8io/magento-pulsar/commit/604863d26d342eb85475cb2ab4c00e24e343ab25))
+
 ## [1.13.0](https://github.com/byte8io/magento-pulsar/compare/v1.12.1...v1.13.0) (2026-08-30)
 
 
