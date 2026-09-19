@@ -38,6 +38,13 @@ class Config
     private const XML_PATH_APPLIED_PATCHES_DIRS = 'byte8_pulsar/checks/applied_patches_dirs';
     private const XML_PATH_APPLIED_PATCHES_SOURCES = 'byte8_pulsar/checks/applied_patches_sources';
 
+    // Detection-signature feed (pulled from pulsar-server's /signatures/bundle;
+    // merged into ContentIntegrityCollector so detection tracks new zero-days
+    // without a module release). See the Byte8 platform advisory-tasks doc §E.
+    private const XML_PATH_SIGNATURE_FEED_ENABLED = 'byte8_pulsar/signature_feed/enabled';
+    private const XML_PATH_SIGNATURE_FEED_ENDPOINT = 'byte8_pulsar/signature_feed/endpoint';
+    private const XML_PATH_SIGNATURE_FEED_TOKEN = 'byte8_pulsar/signature_feed/token';
+
     private const DEFAULT_APPLIED_PATCHES_DIRS = ['patches'];
     private const DEFAULT_APPLIED_PATCHES_SOURCES = ['composer_json', 'installed_json', 'patch_dirs'];
 
@@ -180,6 +187,34 @@ class Config
     public function isTransactionalEmailCheckEnabled(): bool
     {
         return $this->scopeConfig->isSetFlag(self::XML_PATH_TRANSACTIONAL_EMAIL_ENABLED);
+    }
+
+    public function isSignatureFeedEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_SIGNATURE_FEED_ENABLED);
+    }
+
+    /**
+     * Full URL of the pulsar-server detection-signature feed, e.g.
+     * https://pulsar.byte8.io/signatures/bundle. Empty when unconfigured.
+     */
+    public function getSignatureFeedEndpoint(): ?string
+    {
+        $value = trim((string) $this->scopeConfig->getValue(self::XML_PATH_SIGNATURE_FEED_ENDPOINT));
+        return $value !== '' ? $value : null;
+    }
+
+    /**
+     * Shared bearer token (SIGNATURE_FEED_TOKEN on pulsar-server). Stored
+     * encrypted at rest, like the health-endpoint api_key.
+     */
+    public function getSignatureFeedToken(): ?string
+    {
+        $value = $this->scopeConfig->getValue(self::XML_PATH_SIGNATURE_FEED_TOKEN);
+        if ($value) {
+            return $this->encryptor->decrypt($value);
+        }
+        return null;
     }
 
     public function isAppliedPatchesCheckEnabled(): bool

@@ -189,6 +189,29 @@
                     </depends>
                 </field>
             </group>
+            <group id="signature_feed" translate="label" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Detection Signature Feed</label>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Signature Feed</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Pull updated content-integrity detection signatures from Pulsar hourly, so new skimmer/zero-day patterns are detected without a module update. Last-known-good is kept if the feed is unreachable.</comment>
+                </field>
+                <field id="endpoint" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Feed URL</label>
+                    <comment><![CDATA[Full URL of the Pulsar signature feed, e.g. <code>https://pulsar.byte8.io/signatures/bundle</code>. Leave empty to disable pulling.]]></comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="token" translate="label comment" type="obscure" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Feed Token</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <comment>Shared bearer token for the feed (the SIGNATURE_FEED_TOKEN configured on pulsar-server). Stored encrypted.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+            </group>
         </section>
     </system>
 </config>

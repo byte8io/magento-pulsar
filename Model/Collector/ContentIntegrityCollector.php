@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Byte8\Pulsar\Model\Collector;
 
 use Byte8\Pulsar\Model\Config;
+use Byte8\Pulsar\Model\SignatureFeed\Repository as SignatureRepository;
 use Magento\Framework\App\ResourceConnection;
 
 /**
@@ -96,9 +97,21 @@ class ContentIntegrityCollector implements CollectorInterface
     /** Cap findings returned in the payload (status is unaffected by the cap). */
     private const MAX_FINDINGS_REPORTED = 50;
 
+    /**
+     * Normalized content_integrity signatures pulled from the Pulsar feed
+     * (last-known-good). Loaded once per collect(), matched in scanValue()
+     * alongside the built-in markers so detection tracks new zero-days without
+     * a module release. Live IOCs arrive here at RUNTIME (encoded server-side if
+     * needed) — never as source literals, honouring the no-IOC-in-source rule.
+     *
+     * @var list<array{key: string, markers: list<string>, severity: string, type: string}>
+     */
+    private array $remoteSignatures = [];
+
     public function __construct(
         private readonly ResourceConnection $resourceConnection,
-        private readonly Config $config
+        private readonly Config $config,
+        private readonly SignatureRepository $signatures
     ) {
     }
 
@@ -112,6 +125,7 @@ class ContentIntegrityCollector implements CollectorInterface
         try {
             $connection = $this->resourceConnection->getConnection();
             $allowlist = $this->buildAllowlist($connection);
+            $this->remoteSignatures = $this->signatures->getSignatures('content_integrity');
 
             $findings = [];
             $compromised = false;
@@ -278,6 +292,19 @@ class ContentIntegrityCollector implements CollectorInterface
             $compromise[] = 'obfuscator variables with dynamic execution';
         }
 
+        // --- feed-delivered signatures (last-known-good from pulsar-server) ---
+        foreach ($this->remoteSignatures as $sig) {
+            if (!$this->remoteSignatureMatches($lower, $sig)) {
+                continue;
+            }
+            $label = 'feed:' . $sig['key'];
+            if ($sig['severity'] === 'critical') {
+                $compromise[] = $label;
+            } else {
+                $suspicious[] = $label;
+            }
+        }
+
         // --- lower-confidence: review signals ---
         if (str_contains($lower, 'http-equiv="content-security-policy"')
             || str_contains($lower, "http-equiv='content-security-policy'")
@@ -308,6 +335,34 @@ class ContentIntegrityCollector implements CollectorInterface
         }
 
         return null;
+    }
+
+    /**
+     * Apply one feed signature to a (lowercased) value. `substring_any` matches
+     * if any marker is present; `substring_all` requires every marker.
+     *
+     * @param array{key: string, markers: list<string>, severity: string, type: string} $sig
+     */
+    private function remoteSignatureMatches(string $lower, array $sig): bool
+    {
+        if ($sig['markers'] === []) {
+            return false;
+        }
+        if ($sig['type'] === 'substring_all') {
+            foreach ($sig['markers'] as $marker) {
+                if (!str_contains($lower, $marker)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        // default: substring_any
+        foreach ($sig['markers'] as $marker) {
+            if (str_contains($lower, $marker)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

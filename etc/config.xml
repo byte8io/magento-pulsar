@@ -37,6 +37,11 @@
                 <applied_patches_dirs/>
                 <applied_patches_sources>composer_json,installed_json,patch_dirs</applied_patches_sources>
             </checks>
+            <signature_feed>
+                <enabled>1</enabled>
+                <endpoint/>
+                <token/>
+            </signature_feed>
         </byte8_pulsar>
     </default>
 </config>
