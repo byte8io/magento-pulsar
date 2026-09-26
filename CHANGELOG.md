@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.15.0](https://github.com/byte8io/magento-pulsar/compare/v1.14.0...v1.15.0) (2026-09-26)
+
+
+### Features
+
+* pull detection signatures from Pulsar feed (v1.14.0) ([bd6dd3f](https://github.com/byte8io/magento-pulsar/commit/bd6dd3f9567c36454bb17d849631473f97062b46))
+
+
+### Documentation
+
+* public README — product links, collectors, install, config ([f8f4020](https://github.com/byte8io/magento-pulsar/commit/f8f4020bab8c66a0c7451b1fc08a3fa337db969d))
+
 ## [1.14.0](https://github.com/byte8io/magento-pulsar/compare/v1.13.0...v1.14.0) (2026-09-14)
 
 
