@@ -32,7 +32,8 @@ class MediaIntegrityCollector implements CollectorInterface
      *
      * `allowed_extensions = null` means "no extension is expected" — every
      * file (except those in `ignored_files`) counts as unexpected. Use this
-     * for directories that should normally be empty (tmp/, captcha/).
+     * for directories that should normally hold no typed content (e.g.
+     * downloadable/, where any file present is worth an operator's review).
      */
     private const SUBDIR_RULES = [
         'import' => [
@@ -81,8 +82,17 @@ class MediaIntegrityCollector implements CollectorInterface
             'critical' => 1000,
         ],
         'tmp' => [
-            // Temp uploads — should be drained regularly
-            'allowed_extensions' => null,
+            // Staging area for admin/import uploads. Product images uploaded in
+            // the admin land in tmp/catalog/product/ before being moved to their
+            // permanent location, and Magento has no reliable cron to drain them,
+            // so legitimate image files accumulate here in normal operation. Count
+            // only genuinely unexpected file types (an executable or archive here
+            // is worth a look); PHP-executable and polyshell payloads in tmp are
+            // already covered by findExecutableFiles()/findPolyshellFiles().
+            'allowed_extensions' => [
+                'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico',
+                'csv', 'tsv', 'txt', 'xml', 'json',
+            ],
             'ignored_files' => ['.htaccess'],
             'warning' => 100,
             'critical' => 500,
