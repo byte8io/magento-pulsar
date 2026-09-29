@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.1](https://github.com/byte8io/magento-pulsar/compare/v1.15.0...v1.15.1) (2026-09-29)
+
+
+### Bug Fixes
+
+* stop media_integrity flagging legitimate tmp uploads as unexpected ([7f59256](https://github.com/byte8io/magento-pulsar/commit/7f5925647512255fdc7a0191b63af56293a2e5c4))
+
 ## [1.15.0](https://github.com/byte8io/magento-pulsar/compare/v1.14.0...v1.15.0) (2026-09-26)
 
 
