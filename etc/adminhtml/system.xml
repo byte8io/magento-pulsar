@@ -107,6 +107,38 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Check for stuck orders and payment failures</comment>
                 </field>
+                <field id="orders_uncaptured_enabled" translate="label comment" type="select" sortOrder="141" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Detect Shipped-but-Uncaptured Orders</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[For deferred-capture flows (authorize → ship → capture on invoice/shipment, e.g. German "capture on invoice", Mollie capture-on-shipment, or a connector creating the invoice). Flags orders that were shipped but whose payment was authorized and never captured — goods out, money not collected. Leave off unless your store captures payment at or after shipment.]]></comment>
+                    <depends>
+                        <field id="orders_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="orders_uncaptured_hours" translate="label comment" type="text" sortOrder="142" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Uncaptured Grace Period (hours)</label>
+                    <comment>How long after the first shipment to wait before flagging an uncaptured order, giving the capture job time to run (default: 24). Only shipments from the last 30 days are considered.</comment>
+                    <depends>
+                        <field id="orders_enabled">1</field>
+                        <field id="orders_uncaptured_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="orders_uncaptured_warning" translate="label comment" type="text" sortOrder="143" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Uncaptured Warning Threshold</label>
+                    <comment>Number of shipped-but-uncaptured orders before status becomes degraded (default: 1)</comment>
+                    <depends>
+                        <field id="orders_enabled">1</field>
+                        <field id="orders_uncaptured_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="orders_uncaptured_critical" translate="label comment" type="text" sortOrder="144" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Uncaptured Critical Threshold</label>
+                    <comment>Number of shipped-but-uncaptured orders before status becomes critical (default: 5)</comment>
+                    <depends>
+                        <field id="orders_enabled">1</field>
+                        <field id="orders_uncaptured_enabled">1</field>
+                    </depends>
+                </field>
                 <field id="integrations_enabled" translate="label comment" type="select" sortOrder="150" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Integration Status</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>

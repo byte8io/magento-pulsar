@@ -31,7 +31,7 @@ The extension is intentionally simple: it exposes a single secure JSON endpoint,
 
 | Collector | Catches |
 |---|---|
-| `orders` | Order-flow anomalies (the "site is up but nobody can buy" class) |
+| `orders` | Order-flow anomalies (the "site is up but nobody can buy" class), incl. deferred-capture orders shipped but never captured (opt-in) |
 | `transactional_email` | Silently unsent order/invoice emails — losses that a retry cron never sees |
 | `integrations` | Broken API integrations |
 
