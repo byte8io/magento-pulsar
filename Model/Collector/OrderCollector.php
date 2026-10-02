@@ -6,6 +6,7 @@ namespace Byte8\Pulsar\Model\Collector;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\DB\Adapter\AdapterInterface;
 
 class OrderCollector implements CollectorInterface
 {
@@ -14,29 +15,38 @@ class OrderCollector implements CollectorInterface
     private const STUCK_CRITICAL_THRESHOLD = 20;
     private const FAILED_WARNING_THRESHOLD = 10;
 
-    // Deferred-capture (authorize → ship → capture) monitoring.
-    // Relevant to merchants whose flow captures payment at/after shipment —
-    // e.g. German "capture on invoice/shipment", Mollie capture-on-shipment,
-    // or a connector (PlentyONE) creating the invoice programmatically. If that
-    // capture silently fails the goods leave the warehouse but money is never
-    // collected. Opt-in: off by default, since immediate-capture stores never
-    // see an authorization-without-capture order.
+    // --- Capture reconciliation ("shipped but never captured") ---------------
+    // For deferred-capture flows (authorize → fulfil → capture on invoice/
+    // shipment): German "capture on invoice", Mollie/Klarna manual capture,
+    // or a connector (PlentyONE) that fulfils in an ERP and captures back in
+    // Magento. If that capture silently fails the goods leave but the money is
+    // never collected — and the authorization expires (~28d), after which it is
+    // permanently lost. Principle: watch the money, not the errors — detect the
+    // state regardless of which bug caused it.
+    //
+    // Real incident (getkapp.de): a Mollie upgrade dropped capture ~100%→~0%;
+    // orders shipped in PlentyONE (no Magento shipment row at all) with
+    // total_paid NULL for days. Detection therefore must NOT require a Magento
+    // shipment, and must treat the capture deadline as the urgency driver.
     private const XML_PATH_UNCAPTURED_ENABLED = 'byte8_pulsar/checks/orders_uncaptured_enabled';
-    private const XML_PATH_UNCAPTURED_HOURS = 'byte8_pulsar/checks/orders_uncaptured_hours';
-    private const XML_PATH_UNCAPTURED_WARNING = 'byte8_pulsar/checks/orders_uncaptured_warning';
-    private const XML_PATH_UNCAPTURED_CRITICAL = 'byte8_pulsar/checks/orders_uncaptured_critical';
+    private const XML_PATH_UNCAPTURED_METHODS = 'byte8_pulsar/checks/orders_uncaptured_methods';
+    private const XML_PATH_UNCAPTURED_WINDOW_DAYS = 'byte8_pulsar/checks/orders_uncaptured_window_days';
+    private const XML_PATH_UNCAPTURED_WARNING_DAYS = 'byte8_pulsar/checks/orders_uncaptured_warning_days';
+    private const XML_PATH_UNCAPTURED_CRITICAL_DAYS = 'byte8_pulsar/checks/orders_uncaptured_critical_days';
 
-    private const DEFAULT_UNCAPTURED_HOURS = 24;
-    private const DEFAULT_UNCAPTURED_WARNING = 1;
-    private const DEFAULT_UNCAPTURED_CRITICAL = 5;
+    // Manual-capture window (card auth lifetime). Default mirrors Klarna/Mollie
+    // ≈ 28 days from authorization; the deadline shown is created_at + window.
+    private const DEFAULT_WINDOW_DAYS = 28;
+    private const DEFAULT_WARNING_DAYS = 7;
+    private const DEFAULT_CRITICAL_DAYS = 21;
 
     /**
-     * Only consider shipments from the last N days. Card authorizations expire
-     * within ~7–28 days, so older uncaptured orders are usually unrecoverable
-     * and would otherwise be permanent noise; this also bounds the join cost.
+     * Only consider orders from the last N days. Beyond this the money is almost
+     * always unrecoverable; also bounds the query. 90d keeps an order visible
+     * well past its capture deadline so a loss doesn't silently scroll away.
      */
-    private const UNCAPTURED_LOOKBACK_DAYS = 30;
-    private const UNCAPTURED_SAMPLE_LIMIT = 20;
+    private const UNCAPTURED_LOOKBACK_DAYS = 90;
+    private const UNCAPTURED_SAMPLE_LIMIT = 50;
 
     public function __construct(
         private readonly ResourceConnection $resourceConnection,
@@ -108,20 +118,14 @@ class OrderCollector implements CollectorInterface
                 'by_status_24h' => $byStatus,
             ];
 
-            // Opt-in deferred-capture check: shipped but never captured.
+            // Opt-in capture reconciliation.
             if ($this->scopeConfig->isSetFlag(self::XML_PATH_UNCAPTURED_ENABLED)) {
                 $uncaptured = $this->collectUncapturedShipped($connection);
                 $result['uncaptured_shipped'] = $uncaptured;
 
-                $warning = max(1, (int) ($this->scopeConfig->getValue(self::XML_PATH_UNCAPTURED_WARNING)
-                    ?: self::DEFAULT_UNCAPTURED_WARNING));
-                $critical = max($warning, (int) ($this->scopeConfig->getValue(self::XML_PATH_UNCAPTURED_CRITICAL)
-                    ?: self::DEFAULT_UNCAPTURED_CRITICAL));
-
-                $count = $uncaptured['count'];
-                if ($count >= $critical) {
+                if ($uncaptured['critical_count'] > 0) {
                     $result['status'] = self::STATUS_CRITICAL;
-                } elseif ($count >= $warning && $result['status'] !== self::STATUS_CRITICAL) {
+                } elseif ($uncaptured['warning_count'] > 0 && $result['status'] !== self::STATUS_CRITICAL) {
                     $result['status'] = self::STATUS_DEGRADED;
                 }
             }
@@ -136,31 +140,43 @@ class OrderCollector implements CollectorInterface
     }
 
     /**
-     * Find orders that were shipped but whose payment was authorized and never
-     * captured — the deferred-capture failure mode (authorize → ship → capture).
+     * Find open orders that were authorized/fulfilled but never captured.
      *
-     * Detection relies on payment *transactions*, not total_paid/total_invoiced:
-     * an offline invoice inflates total_paid without any real gateway capture
-     * (see the payment-integrity gap), so the reliable signal is an
-     * `authorization` transaction present with no matching `capture`. Requiring
-     * the authorization also excludes genuine pay-later methods (bank transfer,
-     * open invoice) that never authorize online, keeping false positives near
-     * zero for stores that don't use deferred capture.
+     * An order is "at risk" when ALL of:
+     *   - uncaptured: total_paid IS NULL/0 AND no `capture` payment transaction
+     *     (never trust total_paid/total_invoiced alone — an offline Invoice::pay()
+     *     sets them without any real gateway capture);
+     *   - still open: state NOT IN (canceled, closed);
+     *   - within the lookback window (default 90d);
+     * AND there is positive evidence it *should* have been captured by now
+     * (otherwise we can't distinguish a legitimate pay-later / open-invoice
+     * order). Evidence is any of:
+     *   - a Magento shipment exists, OR
+     *   - the PlentyONE connector marks it shipped (plenty_order_entity.status_id
+     *     in [7,8) — auto-detected only when that table is present), OR
+     *   - an `authorization` payment transaction exists (money was reserved), OR
+     *   - the payment method matches a configured deferred-capture pattern.
      *
-     * Age is measured from the first shipment: the goods have physically left
-     * more than `hours` ago yet no money has been taken.
+     * Severity is keyed to age vs the manual-capture deadline, not to a count:
+     * one order a day from losing its authorization is already critical.
      *
-     * @return array{count: int, window_hours: int, lookback_days: int, sample: list<array<string, mixed>>}
+     * @return array{
+     *   count:int, critical_count:int, warning_count:int,
+     *   sum_at_risk:float, critical_sum_at_risk:float, base_currency:?string,
+     *   window_days:int, warning_days:int, critical_days:int, lookback_days:int,
+     *   sample:list<array<string,mixed>>
+     * }
      */
-    private function collectUncapturedShipped(\Magento\Framework\DB\Adapter\AdapterInterface $connection): array
+    private function collectUncapturedShipped(AdapterInterface $connection): array
     {
-        $hours = (int) ($this->scopeConfig->getValue(self::XML_PATH_UNCAPTURED_HOURS)
-            ?: self::DEFAULT_UNCAPTURED_HOURS);
-        $hours = max(1, $hours);
+        $windowDays = $this->positiveInt($this->scopeConfig->getValue(self::XML_PATH_UNCAPTURED_WINDOW_DAYS), self::DEFAULT_WINDOW_DAYS);
+        $warningDays = $this->positiveInt($this->scopeConfig->getValue(self::XML_PATH_UNCAPTURED_WARNING_DAYS), self::DEFAULT_WARNING_DAYS);
+        $criticalDays = $this->positiveInt($this->scopeConfig->getValue(self::XML_PATH_UNCAPTURED_CRITICAL_DAYS), self::DEFAULT_CRITICAL_DAYS);
+        if ($criticalDays < $warningDays) {
+            $criticalDays = $warningDays;
+        }
 
-        $now = new \DateTime();
-        $threshold = (clone $now)->modify(sprintf('-%d hours', $hours))->format('Y-m-d H:i:s');
-        $lookbackStart = (clone $now)
+        $lookbackStart = (new \DateTime())
             ->modify(sprintf('-%d days', self::UNCAPTURED_LOOKBACK_DAYS))
             ->format('Y-m-d H:i:s');
 
@@ -168,75 +184,163 @@ class OrderCollector implements CollectorInterface
         $paymentTable = $this->resourceConnection->getTableName('sales_order_payment');
         $shipmentTable = $this->resourceConnection->getTableName('sales_shipment');
         $txnTable = $this->resourceConnection->getTableName('sales_payment_transaction');
+        $plentyTable = $this->resourceConnection->getTableName('plenty_order_entity');
 
-        $bind = [
-            'lookback_start' => $lookbackStart,
-            'threshold' => $threshold,
+        $hasPlenty = $connection->isTableExists($plentyTable);
+        $hasMollieColumn = $connection->tableColumnExists($orderTable, 'mollie_transaction_id');
+
+        $bind = ['lookback_start' => $lookbackStart];
+
+        // Positive-evidence clauses (OR'd together).
+        $evidence = [
+            sprintf('EXISTS (SELECT 1 FROM %s s WHERE s.order_id = o.entity_id)', $shipmentTable),
+            sprintf(
+                "EXISTS (SELECT 1 FROM %s ta WHERE ta.order_id = o.entity_id AND ta.txn_type = 'authorization')",
+                $txnTable
+            ),
         ];
+        if ($hasPlenty) {
+            $evidence[] = 'pe.status_id >= 7 AND pe.status_id < 8';
+        }
+        foreach ($this->configuredMethods() as $i => $pattern) {
+            $key = 'method_' . $i;
+            $evidence[] = sprintf('pay.method LIKE :%s', $key);
+            $bind[$key] = '%' . $pattern . '%';
+        }
 
-        // Shared FROM/JOIN/WHERE for both the count and the sample. The payment
-        // join is 1:1 per order so it doesn't affect the count. HAVING on
-        // MIN(shipment.created_at) ensures the FIRST shipment is older than the
-        // window (not merely that some later shipment is).
+        $plentyJoin = $hasPlenty
+            ? sprintf(' LEFT JOIN %s pe ON pe.order_id = o.entity_id', $plentyTable)
+            : '';
+
+        // Shared FROM + WHERE for both the aggregate and the sample.
         $core = sprintf(
             ' FROM %1$s o'
-            . ' INNER JOIN %4$s pay ON pay.parent_id = o.entity_id'
-            . ' INNER JOIN %2$s sh ON sh.order_id = o.entity_id'
-            . ' INNER JOIN %3$s ta ON ta.order_id = o.entity_id AND ta.txn_type = \'authorization\''
-            . ' LEFT JOIN %3$s tc ON tc.order_id = o.entity_id AND tc.txn_type = \'capture\''
+            . ' INNER JOIN %2$s pay ON pay.parent_id = o.entity_id'
+            . '%3$s'
             . ' WHERE o.base_grand_total > 0'
-            . ' AND tc.transaction_id IS NULL'
-            . ' AND sh.created_at >= :lookback_start',
+            . ' AND (o.total_paid IS NULL OR o.total_paid = 0)'
+            . " AND o.state NOT IN ('canceled','closed')"
+            . ' AND o.created_at > :lookback_start'
+            . sprintf(
+                " AND NOT EXISTS (SELECT 1 FROM %s tc WHERE tc.order_id = o.entity_id AND tc.txn_type = 'capture')",
+                $txnTable
+            )
+            . ' AND (' . implode(' OR ', $evidence) . ')',
             $orderTable,
-            $shipmentTable,
-            $txnTable,
-            $paymentTable
+            $paymentTable,
+            $plentyJoin
         );
 
-        $count = (int) $connection->fetchOne(
-            'SELECT COUNT(*) FROM ('
-            . ' SELECT o.entity_id' . $core
-            . ' GROUP BY o.entity_id HAVING MIN(sh.created_at) < :threshold'
-            . ') t',
+        // $criticalDays/$warningDays are validated positive ints, inlined here
+        // because a named placeholder reused across the query can trip PDO binding.
+        $agg = $connection->fetchRow(
+            'SELECT COUNT(*) AS total,'
+            . ' COALESCE(SUM(o.base_grand_total), 0) AS sum_at_risk,'
+            . sprintf(
+                ' COALESCE(SUM(CASE WHEN DATEDIFF(NOW(), o.created_at) >= %1$d THEN 1 ELSE 0 END), 0) AS critical_count,'
+                . ' COALESCE(SUM(CASE WHEN DATEDIFF(NOW(), o.created_at) >= %2$d'
+                . ' AND DATEDIFF(NOW(), o.created_at) < %1$d THEN 1 ELSE 0 END), 0) AS warning_count,'
+                . ' COALESCE(SUM(CASE WHEN DATEDIFF(NOW(), o.created_at) >= %1$d'
+                . ' THEN o.base_grand_total ELSE 0 END), 0) AS critical_sum',
+                $criticalDays,
+                $warningDays
+            )
+            . $core,
             $bind
-        );
+        ) ?: [];
+
+        $total = (int) ($agg['total'] ?? 0);
 
         $sample = [];
-        if ($count > 0) {
+        if ($total > 0) {
+            $mollieSelect = $hasMollieColumn ? ', o.mollie_transaction_id' : '';
+            $plentySelect = $hasPlenty ? ', pe.plenty_id, pe.status_id AS plenty_status' : '';
+
             $rows = $connection->fetchAll(
-                'SELECT o.increment_id, o.store_id, o.base_grand_total, o.base_total_invoiced, o.order_currency_code,'
-                . ' pay.method AS payment_method,'
-                . ' MIN(sh.created_at) AS first_shipped_at, MAX(ta.created_at) AS authorized_at'
+                'SELECT o.increment_id, o.store_id, o.created_at, o.base_grand_total,'
+                . ' o.grand_total, o.order_currency_code, o.state, pay.method AS payment_method,'
+                . ' DATEDIFF(NOW(), o.created_at) AS age_days,'
+                . sprintf(
+                    ' EXISTS (SELECT 1 FROM %s s WHERE s.order_id = o.entity_id) AS has_magento_shipment',
+                    $shipmentTable
+                )
+                . $mollieSelect
+                . $plentySelect
                 . $core
-                . ' GROUP BY o.entity_id, o.increment_id, o.store_id, o.base_grand_total,'
-                . ' o.base_total_invoiced, o.order_currency_code, pay.method'
-                . ' HAVING MIN(sh.created_at) < :threshold'
-                . ' ORDER BY first_shipped_at ASC'
+                . ' ORDER BY o.created_at ASC'
                 . ' LIMIT ' . self::UNCAPTURED_SAMPLE_LIMIT,
                 $bind
             );
 
             foreach ($rows as $row) {
-                $sample[] = [
+                $age = (int) $row['age_days'];
+                $severity = $age >= $criticalDays
+                    ? self::STATUS_CRITICAL
+                    : ($age >= $warningDays ? self::STATUS_DEGRADED : 'info');
+
+                $deadline = (new \DateTime($row['created_at']))
+                    ->modify(sprintf('+%d days', $windowDays))
+                    ->format('Y-m-d');
+
+                $entry = [
                     'increment_id' => $row['increment_id'],
                     'store_id' => (int) $row['store_id'],
                     'payment_method' => $row['payment_method'],
                     'base_grand_total' => (float) $row['base_grand_total'],
-                    'base_total_invoiced' => $row['base_total_invoiced'] !== null
-                        ? (float) $row['base_total_invoiced']
-                        : null,
+                    'grand_total' => (float) $row['grand_total'],
                     'currency' => $row['order_currency_code'],
-                    'first_shipped_at' => $row['first_shipped_at'],
-                    'authorized_at' => $row['authorized_at'],
+                    'state' => $row['state'],
+                    'created_at' => $row['created_at'],
+                    'age_days' => $age,
+                    'capture_deadline' => $deadline,
+                    'has_magento_shipment' => (bool) $row['has_magento_shipment'],
+                    'severity' => $severity,
                 ];
+                if ($hasMollieColumn) {
+                    $entry['mollie_transaction_id'] = $row['mollie_transaction_id'];
+                }
+                if ($hasPlenty) {
+                    $entry['plenty_id'] = $row['plenty_id'];
+                    $entry['plenty_status'] = $row['plenty_status'];
+                }
+                $sample[] = $entry;
             }
         }
 
         return [
-            'count' => $count,
-            'window_hours' => $hours,
+            'count' => $total,
+            'critical_count' => (int) ($agg['critical_count'] ?? 0),
+            'warning_count' => (int) ($agg['warning_count'] ?? 0),
+            'sum_at_risk' => round((float) ($agg['sum_at_risk'] ?? 0), 2),
+            'critical_sum_at_risk' => round((float) ($agg['critical_sum'] ?? 0), 2),
+            'base_currency' => $this->scopeConfig->getValue('currency/options/base') ?: null,
+            'window_days' => $windowDays,
+            'warning_days' => $warningDays,
+            'critical_days' => $criticalDays,
             'lookback_days' => self::UNCAPTURED_LOOKBACK_DAYS,
             'sample' => $sample,
         ];
+    }
+
+    /**
+     * Deferred-capture payment-method patterns the operator configured
+     * (comma/newline separated, e.g. "mollie,klarna"). Used as one of the
+     * positive-evidence signals; empty when unset.
+     *
+     * @return list<string>
+     */
+    private function configuredMethods(): array
+    {
+        $raw = (string) $this->scopeConfig->getValue(self::XML_PATH_UNCAPTURED_METHODS);
+        return array_values(array_filter(array_map(
+            'trim',
+            (array) preg_split('/[,\n\r]+/', $raw)
+        )));
+    }
+
+    private function positiveInt(mixed $value, int $default): int
+    {
+        $int = (int) $value;
+        return $int > 0 ? $int : $default;
     }
 }

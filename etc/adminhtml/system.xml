@@ -108,32 +108,40 @@
                     <comment>Check for stuck orders and payment failures</comment>
                 </field>
                 <field id="orders_uncaptured_enabled" translate="label comment" type="select" sortOrder="141" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Detect Shipped-but-Uncaptured Orders</label>
+                    <label>Capture Reconciliation (shipped but not captured)</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment><![CDATA[For deferred-capture flows (authorize → ship → capture on invoice/shipment, e.g. German "capture on invoice", Mollie capture-on-shipment, or a connector creating the invoice). Flags orders that were shipped but whose payment was authorized and never captured — goods out, money not collected. Leave off unless your store captures payment at or after shipment.]]></comment>
+                    <comment><![CDATA[For deferred-capture flows (authorize → fulfil → capture on invoice/shipment, e.g. German "capture on invoice", Mollie/Klarna manual capture, or an ERP connector like PlentyONE). Flags open orders that were authorized/fulfilled but never captured — goods out, money never collected, authorization expiring. Works even when fulfilment happens in a connector with no Magento shipment. Leave off unless your store captures at or after fulfilment.]]></comment>
                     <depends>
                         <field id="orders_enabled">1</field>
                     </depends>
                 </field>
-                <field id="orders_uncaptured_hours" translate="label comment" type="text" sortOrder="142" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Uncaptured Grace Period (hours)</label>
-                    <comment>How long after the first shipment to wait before flagging an uncaptured order, giving the capture job time to run (default: 24). Only shipments from the last 30 days are considered.</comment>
-                    <depends>
-                        <field id="orders_enabled">1</field>
-                        <field id="orders_uncaptured_enabled">1</field>
-                    </depends>
-                </field>
-                <field id="orders_uncaptured_warning" translate="label comment" type="text" sortOrder="143" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Uncaptured Warning Threshold</label>
-                    <comment>Number of shipped-but-uncaptured orders before status becomes degraded (default: 1)</comment>
+                <field id="orders_uncaptured_methods" translate="label comment" type="textarea" sortOrder="142" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Deferred-Capture Payment Methods</label>
+                    <comment><![CDATA[Optional. Comma or newline separated payment-method patterns that use deferred capture (e.g. <code>mollie, klarna</code>). Matched as a substring of the order's payment method. Used as evidence that an uncaptured order should have been captured; leave blank to rely on shipment/authorization evidence alone. Set this if your gateway doesn't record a Magento authorization transaction.]]></comment>
                     <depends>
                         <field id="orders_enabled">1</field>
                         <field id="orders_uncaptured_enabled">1</field>
                     </depends>
                 </field>
-                <field id="orders_uncaptured_critical" translate="label comment" type="text" sortOrder="144" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Uncaptured Critical Threshold</label>
-                    <comment>Number of shipped-but-uncaptured orders before status becomes critical (default: 5)</comment>
+                <field id="orders_uncaptured_window_days" translate="label comment" type="text" sortOrder="143" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Capture Window (days)</label>
+                    <comment>Authorization lifetime used to compute the capture deadline shown on each order (default: 28, ≈ Klarna/Mollie manual capture).</comment>
+                    <depends>
+                        <field id="orders_enabled">1</field>
+                        <field id="orders_uncaptured_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="orders_uncaptured_warning_days" translate="label comment" type="text" sortOrder="144" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Warning Age (days)</label>
+                    <comment>Order age (from creation) at which an uncaptured order becomes degraded (default: 7)</comment>
+                    <depends>
+                        <field id="orders_enabled">1</field>
+                        <field id="orders_uncaptured_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="orders_uncaptured_critical_days" translate="label comment" type="text" sortOrder="145" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Critical Age (days)</label>
+                    <comment>Order age at which an uncaptured order becomes critical — set a few days below the capture window so you act before the authorization expires (default: 21)</comment>
                     <depends>
                         <field id="orders_enabled">1</field>
                         <field id="orders_uncaptured_enabled">1</field>

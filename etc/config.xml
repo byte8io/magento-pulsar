@@ -23,9 +23,10 @@
                 <ssl_enabled>1</ssl_enabled>
                 <orders_enabled>1</orders_enabled>
                 <orders_uncaptured_enabled>0</orders_uncaptured_enabled>
-                <orders_uncaptured_hours>24</orders_uncaptured_hours>
-                <orders_uncaptured_warning>1</orders_uncaptured_warning>
-                <orders_uncaptured_critical>5</orders_uncaptured_critical>
+                <orders_uncaptured_methods/>
+                <orders_uncaptured_window_days>28</orders_uncaptured_window_days>
+                <orders_uncaptured_warning_days>7</orders_uncaptured_warning_days>
+                <orders_uncaptured_critical_days>21</orders_uncaptured_critical_days>
                 <integrations_enabled>1</integrations_enabled>
                 <phpfpm_enabled>0</phpfpm_enabled>
                 <phpfpm_status_url>http://localhost/status?json</phpfpm_status_url>
