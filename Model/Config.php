@@ -31,6 +31,7 @@ class Config
     private const XML_PATH_UPLOAD_ENDPOINT_ENABLED = 'byte8_pulsar/checks/upload_endpoint_enabled';
     private const XML_PATH_DATABASE_SIZE_ENABLED = 'byte8_pulsar/checks/database_size_enabled';
     private const XML_PATH_LOG_ERRORS_ENABLED = 'byte8_pulsar/checks/log_errors_enabled';
+    private const XML_PATH_LOG_ERRORS_IGNORE = 'byte8_pulsar/checks/log_errors_ignore_patterns';
     private const XML_PATH_CONTENT_INTEGRITY_ENABLED = 'byte8_pulsar/checks/content_integrity_enabled';
     private const XML_PATH_CONTENT_INTEGRITY_ALLOWLIST = 'byte8_pulsar/checks/content_integrity_script_allowlist';
     private const XML_PATH_TRANSACTIONAL_EMAIL_ENABLED = 'byte8_pulsar/checks/transactional_email_enabled';
@@ -166,6 +167,24 @@ class Config
     public function isLogErrorsCheckEnabled(): bool
     {
         return $this->scopeConfig->isSetFlag(self::XML_PATH_LOG_ERRORS_ENABLED);
+    }
+
+    /**
+     * Operator-curated known-noise patterns for the log-error collector. Any
+     * captured ERROR/CRITICAL whose message contains one of these (case-
+     * insensitive substring) is dropped before it counts toward status — for
+     * log lines the operator has triaged as benign.
+     *
+     * Split on NEWLINES only (not commas): log messages routinely contain
+     * commas, so one pattern per line. Empty when unset.
+     *
+     * @return list<string>
+     */
+    public function getLogErrorsIgnorePatterns(): array
+    {
+        $raw = (string) $this->scopeConfig->getValue(self::XML_PATH_LOG_ERRORS_IGNORE);
+        $patterns = array_map('trim', preg_split('/\r\n|\r|\n/', $raw) ?: []);
+        return array_values(array_filter($patterns, static fn(string $p): bool => $p !== ''));
     }
 
     public function isContentIntegrityCheckEnabled(): bool

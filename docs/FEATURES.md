@@ -18,7 +18,7 @@ When called with a valid API key, it runs all enabled collectors and returns a J
 {
   "status": "healthy",
   "timestamp": "2026-02-16T14:30:00+00:00",
-  "version": "1.4.0",
+  "version": "1.15.1",
   "checks": {
     "cron": {
       "status": "healthy",
@@ -42,12 +42,20 @@ When called with a valid API key, it runs all enabled collectors and returns a J
     "config_hygiene": { "..." },
     "ssl": { "..." },
     "orders": { "..." },
-    "integrations": { "..." }
+    "integrations": { "..." },
+    "phpfpm": { "..." },
+    "media_integrity": { "..." },
+    "upload_endpoint": { "..." },
+    "database_size": { "..." },
+    "log_errors": { "..." },
+    "content_integrity": { "..." },
+    "transactional_email": { "..." },
+    "applied_patches": { "..." }
   }
 }
 ```
 
-The top-level `status` is the worst status across all enabled collectors: `healthy` > `degraded` > `critical`.
+The top-level `status` is the worst status across all enabled collectors. The ranking, worst-first, is `compromised` > `critical` > `degraded` > `healthy` — `compromised` is a security state (tamper evidence) surfaced separately from the uptime axis, emitted by `media_integrity`, `content_integrity`, and `upload_endpoint`.
 
 ### Authentication
 
@@ -222,10 +230,12 @@ Detects deploy mode misconfigurations, maintenance status, and compilation state
 | `compiled` | Whether DI compilation exists (`generated/metadata/global.php`) |
 | `static_deployed` | Whether static content has been deployed |
 | `static_version` | Deployed static content version string |
+| `var_writable` | Whether `var/` is writable (write-probe) |
+| `static_writable` | Whether `pub/static` is writable (write-probe) |
 
 **Status:**
-- Critical: developer mode
-- Degraded: default mode, maintenance active, or missing compilation/static in production
+- Critical: developer mode, or `var/` not writable (cache, sessions, logs all need it)
+- Degraded: default mode, maintenance active, missing compilation/static in production, or `pub/static` not writable in production
 
 **Why it matters:** Developer mode in production causes severe performance degradation and exposes debug information to visitors. Maintenance mode may be left on accidentally after deployments.
 
@@ -311,18 +321,21 @@ Audits production configuration against best practices. Pure config reads — no
 - Template hints in admin (`dev/debug/template_hints_admin`)
 - Template symlinks (`dev/template/allow_symlink`)
 
-**Warning checks (should be ON):**
-- CSS minification, JS minification
-- CSS merge, JS merge
-- Static content signing
-- Async email sending
-- URL rewrites
+**Warning checks (should be ON — being off triggers Degraded):**
+- CSS minification (`dev/css/minify_files`), JS minification (`dev/js/minify_files`)
+- Static content signing (`dev/static/sign`)
+- URL rewrites (`web/seo/use_rewrites`)
+
+**Advisory checks (reported in the `advisory` field, but do NOT change status):**
+- CSS merge (`dev/css/merge_css_files`), JS merge (`dev/js/merge_files`) — can hurt performance under HTTP/2
+- Async email sending (`sales_email/general/async_sending`) — best practice, but not a storefront performance concern
 
 **Status:**
 - Critical: any "must be off" setting is on (exposes debug info or security risk)
 - Degraded: any "should be on" setting is off (performance or SEO impact)
+- Advisory items appear in the payload for visibility only and never move the status
 
-**Why it matters:** Template hints in production leak internal file paths to visitors. Missing minification/merge degrades page load performance. Async email prevents checkout from blocking on SMTP.
+**Why it matters:** Template hints in production leak internal file paths to visitors. Missing minification degrades page load performance. The advisory items are flagged for awareness without raising a false alarm.
 
 ---
 
@@ -412,6 +425,159 @@ Detects sales confirmation emails (order, invoice, shipment, creditmemo) that we
 **Why it matters:** When emails are sent synchronously (`async_sending` off) and the SMTP server times out during checkout, the exception is thrown *after* the order is saved — `email_sent` stays `NULL`. Magento's retry cron only re-sends `email_sent = 0`, so `NULL` rows are invisible to it: the confirmation is silently lost for good, and nobody notices until a customer complains weeks later. The collector distinguishes these permanent losses from a normal async retry backlog, and escalates harder when the async safety net is off.
 
 **Edge cases:** Canceled orders are excluded (they legitimately get no confirmation). Missing sales tables report zero. Rows older than the 48-hour window age out so a handled incident doesn't pin the collector red.
+
+---
+
+### Log Errors
+
+Parses recent `CRITICAL` and `ERROR` entries from `exception.log` and `system.log`, reading incrementally from the last byte offset (so each check only sees new content) and de-duplicating by a normalized signature. **WARNING, INFO and DEBUG lines are never captured.**
+
+| Metric | Description |
+|--------|-------------|
+| `error_count` | Captured ERROR/CRITICAL entries this run (after noise suppression) |
+| `unique_error_count` | Distinct error signatures |
+| `suppressed_count` | Entries dropped by the known-noise allowlist this run |
+| `files_scanned` | Which of `exception.log` / `system.log` were present |
+| `errors` | Up to 20 unique errors: signature, level, truncated message, count, first/last seen |
+
+**Status:**
+- Critical: any captured `CRITICAL` entry
+- Degraded: any captured `ERROR` entry
+
+**Known-noise allowlist:** operators can suppress specific benign messages via `byte8_pulsar/checks/log_errors_ignore_patterns` (one case-insensitive substring per line — log messages contain commas, so not comma-separated). A matching ERROR/CRITICAL is dropped before it counts toward status or the error list, and tallied in `suppressed_count` so suppression stays observable. No wildcards are needed — a substring matches anywhere (e.g. `Could not acquire lock for cron job: plenty_` silences all `plenty_*` cron lock-contention lines).
+
+**Why it matters:** A climbing `exception.log` while most requests still return HTTP 200 is a classic silent failure — a background subsystem is throwing while the storefront looks fine. The allowlist lets teams quiet genuinely benign recurring errors without disabling the whole check.
+
+---
+
+### Content Integrity
+
+Scans `core_config_data` (head/footer/Misc HTML, all scopes) and CMS pages and blocks for injected JavaScript — the stored-XSS / Magecart skimmer surface that uptime checks are blind to.
+
+| Metric | Description |
+|--------|-------------|
+| `findings_total` | Number of suspicious findings |
+| `findings` | Up to 50 findings: location, severity, what matched |
+| `findings_truncated` | Whether the findings list was capped |
+| `cms_scan_capped` | Whether the CMS row scan hit its 5,000-row cap |
+
+**Status:**
+- Compromised: a high-confidence skimmer / obfuscation signature (hex-encoded URL array, `_0x…` + `eval`/`atob`/`unescape`, `import(_0x…)`, `String.fromCharCode`)
+- Degraded: a lower-confidence signal — an `<script src>` from a host not on the allowlist, or a stray CSP `<meta>` tag (surfaced for review, not a breach claim)
+
+**Allowlist:** `byte8_pulsar/checks/content_integrity_script_allowlist` adds trusted `<script src>` hostnames beyond the built-in list and the store's own domain (parent domain trusts all subdomains; no wildcards). When the detection-signature feed is enabled, new signatures are pulled from the Pulsar server at runtime, so emerging zero-days are caught without a module release.
+
+**Why it matters:** A hacked store can report 100% uptime while a skimmer in a CMS block exfiltrates card data on every checkout. This collector treats that as `compromised` — a security event separate from the uptime SLA.
+
+---
+
+### Media Integrity
+
+Scans `pub/media/` for tamper evidence (webshells) and suspicious upload accumulation.
+
+| Metric | Description |
+|--------|-------------|
+| `executable_files_found` | PHP-executable files (`.php`, `.phtml`, `.phar`, double-extensions) under `pub/media/` |
+| `polyshell_files_found` | Image files carrying an embedded PHP payload (e.g. `GIF89a<?php …`) |
+| `htaccess_issues` | Missing/weak PHP-execution `.htaccess` guards (Apache) |
+| `htaccess_skipped` | True on nginx, where `.htaccess` is not used |
+| `web_server` | Detected server (`nginx` / `apache`) |
+| `monitored_directories` | Per-subdir file counts with unexpected-file tallies (`import`, `tmp`, `customer`, …) |
+
+**Status:**
+- Compromised: any PHP-executable file, or an image with an embedded PHP payload
+- Critical: a missing/weak PHP-execution `.htaccess` guard (Apache only)
+- Degraded → Critical: per-subdirectory unexpected-file volume over threshold
+
+**Why it matters:** A PHP file written into `pub/media/` is a webshell — remote code execution. Per-subdir rules count only *unexpected* file types, so legitimate bulk content (product images in `import/`, staged admin uploads in `tmp/`) never trips an alert.
+
+---
+
+### Upload Endpoint
+
+Tails the web-server access log for automated POSTs to file-upload endpoints — an early webshell-drop indicator.
+
+| Metric | Description |
+|--------|-------------|
+| `log_readable` | Whether a readable access log was found |
+| `log_path` | The access log that was scanned |
+| `upload_posts_found` | POST requests to monitored upload endpoints |
+| `scripted_upload_posts` | Of those, how many came from scripted user agents |
+
+**Status:**
+- Compromised: a scripted upload POST that returned HTTP 200, or ≥ 10 scripted POSTs
+- Critical: ≥ 50 upload POSTs or ≥ 10 scripted POSTs (24h)
+- Degraded: ≥ 10 upload POSTs or ≥ 3 scripted POSTs (24h)
+
+Set the log path in admin if it isn't auto-detected; with no readable log the collector reports healthy with `log_readable: false`.
+
+**Why it matters:** Automated POSTs from `curl`/`python`/`wget`-style agents hammering an upload endpoint are what a webshell drop looks like in the access log, often before the file ever lands.
+
+---
+
+### Database Size
+
+Reports total schema size and the largest tables so runaway growth is caught before it fills the disk. Cached for 24 hours (the query is heavier than the others).
+
+| Metric | Description |
+|--------|-------------|
+| `total_size_mb` | Total database size in MB |
+| `table_count` | Number of tables |
+| `top_tables` | The 10 largest tables (name, size, row count) |
+| `warning_threshold_mb` / `critical_threshold_mb` | The thresholds in effect (5 GB / 10 GB) |
+| `cached` | Whether this result came from the 24h cache |
+
+**Status:**
+- Critical: total DB size ≥ 10 GB
+- Degraded: total DB size ≥ 5 GB
+
+**Why it matters:** `quote`/`quote_*`, `report_*`, and `*_log` tables grow unbounded without cleanup, and a full disk takes the whole store down. Seeing the largest tables tells you exactly what to trim.
+
+---
+
+### Applied Patches
+
+Inventories the security patches a store *declares* and verifies each is actually present in the live code — catching a CVE fix silently reverted by a `composer update` or redeploy.
+
+| Metric | Description |
+|--------|-------------|
+| `identifiers` | Patch identifiers verified present in code |
+| `declared_identifiers` | Patch identifiers the store declares |
+| `patches` | Per-patch detail: file, identifiers, sources, package, verification result |
+| `summary` | Counts of `applied` / `not_applied` / `partial` / `target_missing` / `unknown` |
+| `patch_dirs` | Directories scanned for `.patch`/`.diff` files |
+
+**Status:**
+- Degraded: a declared patch is not applied, partially applied, or its target file is missing
+- Healthy: all declared patches verified present
+
+Declared patches are read from `composer.json`, `vendor/composer/installed.json`, and `.patch`/`.diff` files — configurable via `applied_patches_sources` and `applied_patches_dirs`.
+
+**Why it matters:** Applying a patch and keeping it applied are different things. A `composer update` can quietly pull a package version that drops the fix, re-opening a CVE with no obvious signal.
+
+---
+
+### PHP-FPM
+
+Monitors PHP-FPM pool saturation via the FPM status page. **Disabled by default** — it needs a reachable status URL.
+
+| Metric | Description |
+|--------|-------------|
+| `configured` | Whether the status page was reachable |
+| `active_processes` / `idle_processes` / `total_processes` | Current pool state |
+| `max_active_processes` | Peak active processes |
+| `max_children_reached` | Times the pool hit its `pm.max_children` ceiling |
+| `listen_queue` / `listen_queue_len` | Requests waiting for a free worker |
+| `usage_pct` | Active processes as a percentage of the max |
+
+**Status:**
+- Critical: pool usage ≥ 90%, or any requests sitting in the listen queue
+- Degraded: pool usage ≥ 80%
+- Healthy (`configured: false`): status page unreachable — no false alarm
+
+Enable it, set the **PHP-FPM Status URL** (default `http://localhost/status?json`), and ensure `pm.status_path = /status` in your pool config.
+
+**Why it matters:** When every FPM worker is busy, new requests queue and the store feels down even though the server is "up". The listen queue filling is the leading indicator of a saturation incident.
 
 ---
 

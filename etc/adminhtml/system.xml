@@ -191,6 +191,13 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Parse exception.log and system.log for CRITICAL/ERROR entries and report unique error signatures. Uses incremental reading (only new content since last check).</comment>
                 </field>
+                <field id="log_errors_ignore_patterns" translate="label comment" type="textarea" sortOrder="201" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Known-Noise Ignore Patterns</label>
+                    <comment><![CDATA[Optional. <b>One pattern per line</b> (not comma-separated — log messages contain commas). Any CRITICAL/ERROR whose message contains one of these (case-insensitive substring) is dropped before it counts toward status — for log lines you've triaged as benign. No wildcards needed: a substring matches anywhere, so <code>Could not acquire lock for cron job: plenty_</code> silences all plenty_* lock warnings. Suppressed entries are tallied as <code>suppressed_count</code> in the health payload.]]></comment>
+                    <depends>
+                        <field id="log_errors_enabled">1</field>
+                    </depends>
+                </field>
                 <field id="content_integrity_enabled" translate="label comment" type="select" sortOrder="210" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Content Integrity Status</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>

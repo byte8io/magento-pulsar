@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Byte8\Pulsar\Model\Collector;
 
+use Byte8\Pulsar\Model\Config;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\FlagManager;
 
@@ -25,9 +26,16 @@ class LogErrorCollector implements CollectorInterface
 
     private const FLAG_PREFIX = 'pulsar_log_errors_offset_';
 
+    /** @var list<string> Lower-cased known-noise substrings, loaded per collect(). */
+    private array $ignorePatterns = [];
+
+    /** Count of entries suppressed by the known-noise allowlist this run. */
+    private int $suppressedCount = 0;
+
     public function __construct(
         private readonly DirectoryList $directoryList,
-        private readonly FlagManager $flagManager
+        private readonly FlagManager $flagManager,
+        private readonly Config $config
     ) {
     }
 
@@ -40,6 +48,14 @@ class LogErrorCollector implements CollectorInterface
     {
         $varDir = $this->directoryList->getPath(DirectoryList::VAR_DIR);
         $logDir = $varDir . '/log';
+
+        // Known-noise allowlist: ERROR/CRITICAL lines the operator has triaged
+        // as benign (e.g. cron lock contention) are dropped before they count.
+        $this->ignorePatterns = array_map(
+            'strtolower',
+            $this->config->getLogErrorsIgnorePatterns()
+        );
+        $this->suppressedCount = 0;
 
         $allEntries = [];
         $filesScanned = [];
@@ -102,6 +118,7 @@ class LogErrorCollector implements CollectorInterface
             'status' => $status,
             'error_count' => $totalRawErrors,
             'unique_error_count' => count($uniqueErrors),
+            'suppressed_count' => $this->suppressedCount,
             'files_scanned' => $filesScanned,
             'errors' => array_values(array_map(
                 fn(array $e) => [
@@ -145,6 +162,13 @@ class LogErrorCollector implements CollectorInterface
                 if (in_array($level, self::LEVELS_TO_CAPTURE, true)) {
                     // Extract the message before the JSON context
                     $message = $this->extractMessage($m[4]);
+
+                    // Drop operator-triaged known-noise before it counts.
+                    if ($this->isKnownNoise($message)) {
+                        $this->suppressedCount++;
+                        continue;
+                    }
+
                     $entries[] = [
                         'timestamp' => $m[1],
                         'level' => $level,
@@ -160,6 +184,26 @@ class LogErrorCollector implements CollectorInterface
         }
 
         return $entries;
+    }
+
+    /**
+     * Whether a message matches an operator-configured known-noise pattern
+     * (case-insensitive substring). Patterns are pre-lowercased in collect().
+     */
+    private function isKnownNoise(string $message): bool
+    {
+        if ($this->ignorePatterns === []) {
+            return false;
+        }
+
+        $haystack = strtolower($message);
+        foreach ($this->ignorePatterns as $pattern) {
+            if ($pattern !== '' && str_contains($haystack, $pattern)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

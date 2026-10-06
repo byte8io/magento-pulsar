@@ -78,8 +78,18 @@ Each collector can be independently enabled or disabled. All are enabled by defa
 | **SSL Certificate Status** | `ssl` | SSL certificate validity and expiry |
 | **Order Pipeline Status** | `orders` | Stuck orders and payment failures |
 | **Integration Status** | `integrations` | API integrations and OAuth token health |
+| **PHP-FPM Status** | `phpfpm` | PHP-FPM pool saturation (**off by default** — needs a status URL) |
+| **Media Integrity Status** | `media_integrity` | `pub/media` webshells, polyshell images, suspicious upload-dir volume |
+| **Upload Endpoint Status** | `upload_endpoint` | Automated/scripted POSTs to file-upload endpoints (access-log scan) |
+| **Database Size Status** | `database_size` | Total DB size and largest tables (runaway growth) |
+| **Log Error Monitoring** | `log_errors` | CRITICAL/ERROR signatures in `exception.log` and `system.log` |
+| **Content Integrity Status** | `content_integrity` | Injected skimmer / obfuscated JS in `core_config_data` and CMS content |
+| **Transactional Email Monitoring** | `transactional_email` | Order/invoice/shipment/creditmemo emails requested but never sent |
+| **Applied Patches Status** | `applied_patches` | Declared security patches verified present in live code |
 
-Disabling a collector means it will not be included in the health response at all. The overall status is computed only from enabled collectors.
+There are **23 collectors** in total. Disabling a collector means it will not be included in the health response at all. The overall status is computed only from enabled collectors.
+
+> Some collectors can report a fourth status, **`compromised`** (tamper evidence — e.g. a webshell or injected skimmer), which is surfaced as a security event distinct from the uptime axis. It is produced by `media_integrity`, `content_integrity`, and `upload_endpoint`.
 
 ---
 
@@ -111,7 +121,7 @@ Expected response:
 {
   "status": "healthy",
   "timestamp": "2026-02-16T14:30:00+00:00",
-  "version": "1.4.0",
+  "version": "1.15.1",
   "checks": {
     "cron": { "status": "healthy", "..." },
     "indexer": { "status": "healthy", "..." },
@@ -228,10 +238,12 @@ redis-cli INFO memory | grep -E "used_memory_human|maxmemory_human"
 | Condition | Status |
 |-----------|--------|
 | Developer mode | Critical |
+| `var/` directory not writable | Critical |
 | Default mode | Degraded |
 | Maintenance mode active | Degraded |
 | Production mode without DI compilation | Degraded |
 | Production mode without static content | Degraded |
+| `pub/static` not writable (production) | Degraded |
 
 **Troubleshooting:** Switch to production mode:
 
@@ -307,11 +319,16 @@ If you see persistent brute-force attempts, consider:
 |-------------|---------|
 | `dev/css/minify_files` | CSS minification |
 | `dev/js/minify_files` | JS minification |
-| `dev/css/merge_css_files` | CSS merge |
-| `dev/js/merge_files` | JS merge |
 | `dev/static/sign` | Static content signing |
-| `sales_email/general/async_sending` | Async email sending |
 | `web/seo/use_rewrites` | URL rewrites |
+
+**Advisory (reported in the `advisory` field for visibility, but do NOT change status):**
+
+| Config Path | Setting |
+|-------------|---------|
+| `dev/css/merge_css_files` | CSS merge (can hurt performance under HTTP/2) |
+| `dev/js/merge_files` | JS merge (can hurt performance under HTTP/2) |
+| `sales_email/general/async_sending` | Async email sending (best practice, not a storefront concern) |
 
 **Troubleshooting:** Fix common config issues:
 
@@ -405,6 +422,96 @@ To clean up revoked tokens:
 ```bash
 mysql -e "DELETE FROM oauth_token WHERE revoked = 1;" magento
 ```
+
+### Log Errors — Thresholds & known-noise allowlist
+
+Parses **only** `CRITICAL` and `ERROR` lines from `exception.log` and `system.log` (WARNING/INFO/DEBUG are never captured), reads incrementally from the last offset, and de-duplicates by a normalized signature.
+
+| Condition | Status |
+|-----------|--------|
+| Any captured `CRITICAL` entry | Critical |
+| Any captured `ERROR` entry | Degraded |
+
+**Known-Noise Ignore Patterns** (`byte8_pulsar/checks/log_errors_ignore_patterns`): a CRITICAL/ERROR whose message contains one of these (case-insensitive substring) is dropped *before* it counts toward status or the error list. For log lines you've triaged as benign.
+
+- **One pattern per line** — not comma-separated, because log messages routinely contain commas.
+- **No wildcards needed** — a substring matches anywhere. For example, to silence the benign cron lock-contention warnings (`Could not acquire lock for cron job: plenty_item_map`), enter:
+
+  ```
+  Could not acquire lock for cron job: plenty_
+  ```
+
+  That substring matches every `plenty_*` variant. (Note: those particular lines are logged at `WARNING`, which `log_errors` already ignores — the allowlist matters when a benign message is logged at ERROR/CRITICAL.)
+- Suppressed entries are tallied as `suppressed_count` in the health payload, so the filter is observable and can't silently hide a flood.
+
+### Database Size — Thresholds
+
+Cached for 24 hours (the query is heavier than the others). Reports total schema size and the 10 largest tables.
+
+| Condition | Status |
+|-----------|--------|
+| Total DB size ≥ 10 GB | Critical |
+| Total DB size ≥ 5 GB | Degraded |
+
+Common runaway tables: `quote` / `quote_*`, `report_event`, `report_viewed_product_index`, `*_log`. Trim with the `log:clean` / `quote cleanup` jobs or the maintenance scripts for report tables.
+
+### Media Integrity — Checks
+
+Scans `pub/media/` for tamper evidence and suspicious upload accumulation.
+
+| Condition | Status |
+|-----------|--------|
+| A PHP-executable file (`.php`, `.phtml`, `.phar`, double-extension, …) in `pub/media/` | **Compromised** |
+| An image carrying an embedded PHP payload (polyshell, e.g. `GIF89a<?php …`) | **Compromised** |
+| Missing/weak PHP-execution `.htaccess` guard (Apache only — skipped on nginx) | Critical |
+| Per-subdirectory unexpected-file volume over threshold (`import`, `tmp`, `customer`, …) | Degraded → Critical |
+
+`.htaccess` checks are automatically skipped when the server is nginx (reported as `htaccess_skipped: true`). Per-subdirectory rules count only files whose type is unexpected for that directory, so legitimate bulk content (product images in `import/`, staged uploads in `tmp/`) does not trip an alert.
+
+### Content Integrity — Checks
+
+Scans `core_config_data` (head/footer HTML, Misc HTML) and CMS pages/blocks across all scopes for injected JavaScript.
+
+| Condition | Status |
+|-----------|--------|
+| A high-confidence skimmer / obfuscation signature (hex-encoded URL, `_0x…` + `eval`/`atob`, `import(_0x…)`, `fromCharCode`) | **Compromised** |
+| An `<script src>` from a host not on the allowlist, or a stray CSP `<meta>` | Degraded (review) |
+
+**Trusted Script Hosts** (`byte8_pulsar/checks/content_integrity_script_allowlist`): extra hostnames allowed in `<script src>`, beyond the built-in list and your own store domain. Comma **or** newline separated; parent domain trusts all subdomains (suffix match — no wildcards). Detection signatures are also pulled at runtime from the Pulsar feed when the signature feed is enabled, so new zero-days are caught without a module release.
+
+### Upload Endpoint — Checks
+
+Tails the web-server access log looking for automated POSTs to file-upload endpoints (a webshell-drop indicator).
+
+| Condition | Status |
+|-----------|--------|
+| ≥ 10 scripted-user-agent POSTs, or a scripted POST that got an HTTP 200 on an upload endpoint | **Compromised** |
+| ≥ 50 upload POSTs, or ≥ 10 scripted POSTs (24h) | Critical |
+| ≥ 10 upload POSTs, or ≥ 3 scripted POSTs (24h) | Degraded |
+
+Set the access-log path in admin (`Access Log Path`) if it isn't auto-detected. If no readable log is found, the collector reports healthy with `log_readable: false`.
+
+### Applied Patches — Verification
+
+Inventories security patches the store *declares* (composer.json, `vendor/composer/installed.json`, and `.patch`/`.diff` files in the configured patch dirs) and **verifies each is actually present in the live code**.
+
+| Condition | Status |
+|-----------|--------|
+| A declared patch is not applied / partially applied / its target file is missing | Degraded |
+| All declared patches verified present | Healthy |
+
+Configurable via **Applied Patches Directories** (`applied_patches_dirs`, default `patches`) and **Applied Patches Sources** (`applied_patches_sources` — any of `composer_json`, `installed_json`, `patch_dirs`). The summary reports counts for `applied` / `not_applied` / `partial` / `target_missing` / `unknown`. This catches a CVE patch silently reverted by a `composer update` or redeploy.
+
+### PHP-FPM — Thresholds (off by default)
+
+Disabled by default because it needs the PHP-FPM status page. Enable it, then set **PHP-FPM Status URL** (`phpfpm_status_url`, default `http://localhost/status?json`) and ensure `pm.status_path = /status` in your pool config.
+
+| Condition | Status |
+|-----------|--------|
+| Pool usage ≥ 90%, or any requests in the listen queue | Critical |
+| Pool usage ≥ 80% | Degraded |
+
+If the status page isn't reachable, the collector reports healthy with `configured: false` (no false alarm).
 
 ---
 

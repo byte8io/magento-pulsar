@@ -22,10 +22,10 @@ The extension is intentionally simple: it exposes a single secure JSON endpoint,
 | `search` | OpenSearch/Elasticsearch cluster health |
 | `queue` | Message-queue consumer backlog |
 | `system` | Disk space, load |
-| `php_fpm` | Pool saturation |
+| `phpfpm` | Pool saturation (off by default — needs status URL) |
 | `deploy` | Deploy mode, config drift |
 | `ssl` | Certificate expiry |
-| `log` / `log_error` | Log growth, error bursts in `system.log`/`exception.log` |
+| `log` / `log_errors` | Log growth; ERROR/CRITICAL bursts in `system.log`/`exception.log` (with a known-noise allowlist) |
 
 **Commerce signals**
 
@@ -39,7 +39,7 @@ The extension is intentionally simple: it exposes a single secure JSON endpoint,
 
 | Collector | Catches |
 |---|---|
-| `admin_security` | Weak admin URL, stale admin accounts, 2FA posture |
+| `admin_security` | Failed-login spikes, locked accounts, 2FA posture |
 | `config_hygiene` | Risky configuration drift |
 | `content_integrity` | Injected scripts / payment skimmers in CMS content and store config (signature feed kept fresh via cron) |
 | `media_integrity` / `upload_endpoint` | Executable files in media, exposed upload endpoints |
@@ -71,7 +71,7 @@ bin/magento cache:flush
 
 1. **Enabled** — master switch for the `/pulsar/health` endpoint.
 2. **API key** — paste the key issued when you add the site at [pulsar.byte8.io](https://pulsar.byte8.io).
-3. Per-collector toggles and thresholds (e.g. cron pending/failed warning levels, content-integrity script allowlist, applied-patches sources) — sensible defaults out of the box.
+3. Per-collector toggles and thresholds (e.g. cron pending/failed warning levels, content-integrity script allowlist, applied-patches sources, log-error known-noise ignore patterns) — sensible defaults out of the box.
 
 Requests authenticate with the `X-Pulsar-Key` header (or `Authorization: Bearer`), compared in constant time. The endpoint is read-only and returns metrics only — no customer data.
 
