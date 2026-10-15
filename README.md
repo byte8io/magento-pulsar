@@ -49,17 +49,16 @@ Every collector is individually toggleable with tunable thresholds, and reports 
 
 ## Requirements
 
-- Magento **2.4.x** (Open Source or Adobe Commerce)
+- Magento **2.4.6+** (Open Source or Adobe Commerce)
 - PHP **8.1 – 8.5**
 - Outbound HTTPS to `*.byte8.io`
 - A [Pulsar account](https://byte8.io/products/pulsar)
 
 ## Installation
 
-The package ships from the Byte8 Composer registry ([Cargoman](https://cargoman.io)):
+The package is on [Packagist](https://packagist.org/packages/byte8/module-pulsar), so no extra repository is needed:
 
 ```bash
-composer config repositories.byte8 composer https://cargoman.io
 composer require byte8/module-pulsar
 bin/magento setup:upgrade
 bin/magento cache:flush
