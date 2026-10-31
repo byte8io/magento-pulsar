@@ -11,6 +11,15 @@ use Magento\Indexer\Model\Indexer\State;
 class IndexerCollector implements CollectorInterface
 {
     private const STUCK_THRESHOLD_MINUTES = 60;
+
+    /**
+     * An indexer flagged invalid less than this many minutes ago is being
+     * reindexed right now (catalogrule_apply_all, a deploy, an hourly cron),
+     * not broken. Report it as pending rather than counting it towards
+     * critical/degraded, so a health poll that lands inside that window does
+     * not page anyone.
+     */
+    private const INVALID_GRACE_MINUTES = 10;
     private const SEARCH_INDEXER_ID = 'catalogsearch_fulltext';
 
     public function __construct(
@@ -28,8 +37,10 @@ class IndexerCollector implements CollectorInterface
     {
         $indexers = $this->indexerConfig->getIndexers();
         $stuckThreshold = (new \DateTime())->modify(sprintf('-%d minutes', self::STUCK_THRESHOLD_MINUTES));
+        $graceThreshold = (new \DateTime())->modify(sprintf('-%d minutes', self::INVALID_GRACE_MINUTES));
 
         $invalid = [];
+        $recentlyInvalidated = [];
         $stuck = [];
         $working = [];
         $scheduled = [];
@@ -43,7 +54,12 @@ class IndexerCollector implements CollectorInterface
 
                 switch ($status) {
                     case State::STATUS_INVALID:
-                        $invalid[] = $indexerId;
+                        $updatedAt = $state->getUpdated();
+                        if ($updatedAt && new \DateTime($updatedAt) >= $graceThreshold) {
+                            $recentlyInvalidated[] = $indexerId;
+                        } else {
+                            $invalid[] = $indexerId;
+                        }
                         break;
                     case State::STATUS_WORKING:
                         $updatedAt = $state->getUpdated();
@@ -81,6 +97,7 @@ class IndexerCollector implements CollectorInterface
             'status' => $status,
             'total' => count($indexers),
             'invalid' => $invalid,
+            'recently_invalidated' => $recentlyInvalidated,
             'stuck' => $stuck,
             'working' => $working,
             'scheduled' => $scheduled,
