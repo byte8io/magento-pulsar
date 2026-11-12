@@ -1,0 +1,7 @@
+# Keep the Composer dist (Packagist / Cargoman zip) free of dev-only files.
+# Test fixtures contain real scanner payloads that would trip hosting AV scans.
+/Test                export-ignore
+/.github             export-ignore
+/phpunit.xml.dist    export-ignore
+/.gitattributes      export-ignore
+/release-please-config.json export-ignore

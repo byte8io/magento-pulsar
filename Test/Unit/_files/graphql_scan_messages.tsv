@@ -1,0 +1,42 @@
+ERROR	Variable "$input" got invalid value "-1' OR 5*5=25 or 'Sgpv4vts'='" at "input.express_button"; Boolean cannot represent a non boolean value: "-1' OR 5*5=25 or 'Sgpv4vts'='"
+ERROR	Variable "$input" got invalid value "-1" OR 5*5=25 or "Dp7nHYST"="" at "input.express_button"; Boolean cannot represent a non boolean value: "-1" OR 5*5=25 or "Dp7nHYST"=""
+ERROR	Could not find a cart with ID "-1' OR 5*5=25 or 'mnfNKHwp'='"
+ERROR	Could not find a cart with ID "-1" OR 5*5=25 or "Qh0xp9F9"=""
+ERROR	Variable "$input" got invalid value "trueUjgu7Hfy" at "input.vaultIntent"; Boolean cannot represent a non boolean value: "trueUjgu7Hfy"
+ERROR	Variable "$input" got invalid value "true' AND 2*3*8=6*8 AND '8Ah5'='8Ah5" at "input.vaultIntent"; Boolean cannot represent a non boolean value: "true' AND 2*3*8=6*8 AND '8Ah5'='8Ah5"
+ERROR	Variable "$input" got invalid value "true" AND 2*3*8=6*8 AND "Si1p"="Si1p" at "input.vaultIntent"; Boolean cannot represent a non boolean value: "true" AND 2*3*8=6*8 AND "Si1p"="Si1p"
+ERROR	Variable "$input" got invalid value "true%' AND 2*3*8=6*8 AND '2vfS'!='2vfS%" at "input.vaultIntent"; Boolean cannot represent a non boolean value: "true%' AND 2*3*8=6*8 AND '2vfS'!='2vfS%"
+ERROR	Variable "$input" got invalid value "truepO8CZFbl'; waitfor delay '0:0:15' -- " at "input.vaultIntent"; Boolean cannot represent a non boolean value: "truepO8CZFbl'; waitfor delay '0:0:15' -- "
+ERROR	Variable "$input" got invalid value "trueEndYTNH3' OR 222=(SELECT 222 FROM PG_SLEEP(15))--" at "input.vaultIntent"; Boolean cannot represent a non boolean value: "trueEndYTNH3' OR 222=(SELECT 222 FROM
+ERROR	Variable "$input" got invalid value "trueHfkENQJi') OR 736=(SELECT 736 FROM PG_SLEEP(15))--" at "input.vaultIntent"; Boolean cannot represent a non boolean value: "trueHfkENQJi') OR 736=(SELECT 736 FR
+ERROR	Variable "$input" got invalid value "trueZwWPSJMZ')) OR 369=(SELECT 369 FROM PG_SLEEP(15))--" at "input.vaultIntent"; Boolean cannot represent a non boolean value: "trueZwWPSJMZ')) OR 369=(SELECT 369 
+ERROR	Ein Warenkorb mit der ID "-1' OR 5*5=25 or 'wzpL62ZT'='" konnte nicht gefunden werden.
+ERROR	Ein Warenkorb mit der ID "-1" OR 5*5=25 or "csbwod2T"="" konnte nicht gefunden werden.
+ERROR	Ein Warenkorb mit der ID "1gye7soTd" konnte nicht gefunden werden.
+ERROR	Ein Warenkorb mit der ID "1oI3QjyNk'; waitfor delay '0:0:15' -- " konnte nicht gefunden werden.
+ERROR	Variable "$input" got invalid value "1.000000nht5DTx9" at "input.amount"; Float cannot represent non numeric value: "1.000000nht5DTx9"
+ERROR	Variable "$input" got invalid value "1.000000XBjANuEY'; waitfor delay '0:0:15' -- " at "input.amount"; Float cannot represent non numeric value: "1.000000XBjANuEY'; waitfor delay '0:0:15' -- "
+ERROR	Variable "$input" got invalid value "1.000000XH4ibwqu' OR 326=(SELECT 326 FROM PG_SLEEP(15))--" at "input.amount"; Float cannot represent non numeric value: "1.000000XH4ibwqu' OR 326=(SELECT 326 FROM 
+ERROR	Variable "$id" got invalid value "1FaxJJTnm"; Int cannot represent non-integer value: "1FaxJJTnm"
+ERROR	Variable "$id" got invalid value "19g1F3D13'; waitfor delay '0:0:15' -- "; Int cannot represent non-integer value: "19g1F3D13'; waitfor delay '0:0:15' -- "
+ERROR	Variable "$formType" got invalid value "PLACE_ORDERv2uCetVc"; Value "PLACE_ORDERv2uCetVc" does not exist in "ReCaptchaFormEnum" enum. Did you mean the enum value "PLACE_ORDER"?
+ERROR	Variable "$formType" got invalid value "PLACE_ORDER' AND 2*3*8=6*8 AND 'js3F'='js3F"; Value "PLACE_ORDER' AND 2*3*8=6*8 AND 'js3F'='js3F" does not exist in "ReCaptchaFormEnum" enum.
+ERROR	Variable "$formType" got invalid value "PLACE_ORDER" AND 2*3*8=6*8 AND "tGLq"="tGLq"; Value "PLACE_ORDER" AND 2*3*8=6*8 AND "tGLq"="tGLq" does not exist in "ReCaptchaFormEnum" enum.
+ERROR	Variable "$formType" got invalid value "PLACE_ORDER%' AND 2*3*8=6*8 AND 'Xs7s'!='Xs7s%"; Value "PLACE_ORDER%' AND 2*3*8=6*8 AND 'Xs7s'!='Xs7s%" does not exist in "ReCaptchaFormEnum" enum.
+ERROR	Der CMS-Block mit der ID "-1' OR 5*5=25 or 'Ffo1uBUM'='" existiert nicht.
+ERROR	Der CMS-Block mit der ID "-1" OR 5*5=25 or "sKZq7KYU"="" existiert nicht.
+ERROR	Variable "$useCurrentGroup" got invalid value "truefsvmNgVI"; Boolean cannot represent a non boolean value: "truefsvmNgVI"
+ERROR	Variable "$useCurrentGroup" got invalid value "true' AND 2*3*8=6*8 AND '2BoD'='2BoD"; Boolean cannot represent a non boolean value: "true' AND 2*3*8=6*8 AND '2BoD'='2BoD"
+ERROR	Variable "$useCurrentGroup" got invalid value "true" AND 2*3*8=6*8 AND "mV4l"="mV4l"; Boolean cannot represent a non boolean value: "true" AND 2*3*8=6*8 AND "mV4l"="mV4l"
+ERROR	Variable "$useCurrentGroup" got invalid value "true%' AND 2*3*8=6*8 AND 'lJDl'!='lJDl%"; Boolean cannot represent a non boolean value: "true%' AND 2*3*8=6*8 AND 'lJDl'!='lJDl%"
+ERROR	Variable "$location" got invalid value "PRODUCT_DETAILDLnsTkF3"; Value "PRODUCT_DETAILDLnsTkF3" does not exist in "PaymentLocation" enum. Did you mean the enum value "PRODUCT_DETAIL"?
+ERROR	Variable "$location" got invalid value "PRODUCT_DETAIL' AND 2*3*8=6*8 AND 't85v'='t85v"; Value "PRODUCT_DETAIL' AND 2*3*8=6*8 AND 't85v'='t85v" does not exist in "PaymentLocation" enum.
+ERROR	Variable "$location" got invalid value "PRODUCT_DETAIL" AND 2*3*8=6*8 AND "HDEg"="HDEg"; Value "PRODUCT_DETAIL" AND 2*3*8=6*8 AND "HDEg"="HDEg" does not exist in "PaymentLocation" enum.
+ERROR	Variable "$location" got invalid value "PRODUCT_DETAIL%' AND 2*3*8=6*8 AND 'nw75'!='nw75%"; Value "PRODUCT_DETAIL%' AND 2*3*8=6*8 AND 'nw75'!='nw75%" does not exist in "PaymentLocation" enum.
+ERROR	Variable "$location" got invalid value "PRODUCT_DETAIL3dgLxDhI'; waitfor delay '0:0:15' -- "; Value "PRODUCT_DETAIL3dgLxDhI'; waitfor delay '0:0:15' -- " does not exist in "PaymentLocation" enum.
+ERROR	Variable "$id" got invalid value "-1' OR 5*5=25 or 'UeiijmTl'='"; Int cannot represent non-integer value: "-1' OR 5*5=25 or 'UeiijmTl'='"
+ERROR	Variable "$id" got invalid value "-1" OR 5*5=25 or "Ob7epZmP"=""; Int cannot represent non-integer value: "-1" OR 5*5=25 or "Ob7epZmP"=""
+ERROR	Variable "$id" got invalid value "DE6P5TSx8a"; Int cannot represent non-integer value: "DE6P5TSx8a"
+ERROR	Variable "$id" got invalid value "DEg4atLVAM'; waitfor delay '0:0:15' -- "; Int cannot represent non-integer value: "DEg4atLVAM'; waitfor delay '0:0:15' -- "
+ERROR	Variable "$id" got invalid value "DERoFCoJmZ' OR 189=(SELECT 189 FROM PG_SLEEP(15))--"; Int cannot represent non-integer value: "DERoFCoJmZ' OR 189=(SELECT 189 FROM PG_SLEEP(15))--"
+ERROR	Variable "$id" got invalid value "DEkorODJlV') OR 485=(SELECT 485 FROM PG_SLEEP(15))--"; Int cannot represent non-integer value: "DEkorODJlV') OR 485=(SELECT 485 FROM PG_SLEEP(15))--"

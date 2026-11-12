@@ -440,6 +440,17 @@ Parses recent `CRITICAL` and `ERROR` entries from `exception.log` and `system.lo
 | `files_scanned` | Which of `exception.log` / `system.log` were present |
 | `errors` | Up to 20 unique errors: signature, level, truncated message, count, first/last seen |
 
+Signatures are `sha256(level . ':' . normalized message)`. Normalisation strips
+everything a request can vary — timestamps, UUIDs, hex tokens, emails, IPs,
+digit runs, quoted literals, GraphQL variable values (`got invalid value …`,
+`cannot represent … value: …`, `Value … does not exist in "Enum" enum`),
+`with ID "…"` / `mit der ID "…"` slots and the `Requested store is not found (…)`
+store code — while keeping the structural parts (variable name, `input.path`,
+enum/type/field names). One injection scan against `/graphql` therefore yields
+one signature per variable slot, not one per payload. Rules live in
+`Model/Collector/LogError/MessageNormalizer.php` and are pinned by
+`Test/Unit/Model/Collector/LogError/MessageNormalizerTest.php`.
+
 **Status:**
 - Critical: any captured `CRITICAL` entry
 - Degraded: any captured `ERROR` entry

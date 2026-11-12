@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Byte8\Pulsar\Model\Collector;
 
+use Byte8\Pulsar\Model\Collector\LogError\MessageNormalizer;
 use Byte8\Pulsar\Model\Config;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\FlagManager;
@@ -35,7 +36,8 @@ class LogErrorCollector implements CollectorInterface
     public function __construct(
         private readonly DirectoryList $directoryList,
         private readonly FlagManager $flagManager,
-        private readonly Config $config
+        private readonly Config $config,
+        private readonly MessageNormalizer $normalizer
     ) {
     }
 
@@ -273,45 +275,12 @@ class LogErrorCollector implements CollectorInterface
     }
 
     /**
-     * Normalize a message by stripping dynamic values to produce a stable signature.
+     * Normalize a message by stripping dynamic values to produce a stable
+     * signature. See {@see MessageNormalizer} for the rules.
      */
     private function normalizeMessage(string $message): string
     {
-        $msg = mb_substr($message, 0, self::MESSAGE_TRUNCATE_LENGTH);
-
-        // Strip embedded ISO-8601 timestamps FIRST. Many Magento messages quote a
-        // timestamp in the body (e.g. async-queue "Message has been rejected:
-        // [2026-06-25T03:38:30+00:00] ..."). The numeric pass below cannot remove
-        // the date/hour because they are glued to the `T` separator (no word
-        // boundary), so the signature would otherwise rotate every hour and every
-        // day — re-detecting the same logical error as a brand-new "type".
-        $msg = preg_replace(
-            '/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:?\d{2})?/',
-            '{TS}',
-            $msg
-        );
-
-        // Strip UUIDs (v4 pattern)
-        $msg = preg_replace('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', '{UUID}', $msg);
-
-        // Strip hex/alphanumeric tokens (session IDs, quote IDs, etc.)
-        $msg = preg_replace('/\b[0-9a-f]{16,}\b/i', '{TOKEN}', $msg);
-
-        // Strip email addresses and IPs before the numeric pass, otherwise the
-        // numeric pass mangles their digits and these patterns no longer match.
-        $msg = preg_replace('/[\w.+-]+@[\w.-]+/', '{EMAIL}', $msg);
-        $msg = preg_replace('/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/', '{IP}', $msg);
-
-        // Strip numeric IDs (runs of 2+ digits). Deliberately NOT anchored on word
-        // boundaries so IDs glued to letters (e.g. "order id5512", increment IDs)
-        // also collapse — over-collapsing distinct errors that differ only by a
-        // number is acceptable and desirable for a stable signature.
-        $msg = preg_replace('/\d{2,}/', '{N}', $msg);
-
-        // Collapse whitespace
-        $msg = preg_replace('/\s+/', ' ', trim($msg));
-
-        return $msg;
+        return $this->normalizer->normalize($message);
     }
 
     private function getOffsetState(string $filename): array
