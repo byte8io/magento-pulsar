@@ -38,6 +38,12 @@ class Config
     private const XML_PATH_APPLIED_PATCHES_ENABLED = 'byte8_pulsar/checks/applied_patches_enabled';
     private const XML_PATH_APPLIED_PATCHES_DIRS = 'byte8_pulsar/checks/applied_patches_dirs';
     private const XML_PATH_APPLIED_PATCHES_SOURCES = 'byte8_pulsar/checks/applied_patches_sources';
+    private const XML_PATH_CHECKOUT_FUNNEL_ENABLED = 'byte8_pulsar/checks/checkout_funnel_enabled';
+    private const XML_PATH_CHECKOUT_FUNNEL_WINDOW_HOURS = 'byte8_pulsar/checks/checkout_funnel_window_hours';
+    private const XML_PATH_CHECKOUT_FUNNEL_BASELINE_DAYS = 'byte8_pulsar/checks/checkout_funnel_baseline_days';
+    private const XML_PATH_CHECKOUT_FUNNEL_MIN_CARTS = 'byte8_pulsar/checks/checkout_funnel_min_carts';
+    private const XML_PATH_CHECKOUT_FUNNEL_DEGRADED_DROP_PCT = 'byte8_pulsar/checks/checkout_funnel_degraded_drop_pct';
+    private const XML_PATH_CHECKOUT_FUNNEL_CRITICAL_DROP_PCT = 'byte8_pulsar/checks/checkout_funnel_critical_drop_pct';
 
     // Detection-signature feed (pulled from pulsar-server's /signatures/bundle;
     // merged into ContentIntegrityCollector so detection tracks new zero-days
@@ -48,6 +54,12 @@ class Config
 
     private const DEFAULT_APPLIED_PATCHES_DIRS = ['patches'];
     private const DEFAULT_APPLIED_PATCHES_SOURCES = ['composer_json', 'installed_json', 'patch_dirs'];
+
+    private const DEFAULT_CHECKOUT_FUNNEL_WINDOW_HOURS = 24;
+    private const DEFAULT_CHECKOUT_FUNNEL_BASELINE_DAYS = 28;
+    private const DEFAULT_CHECKOUT_FUNNEL_MIN_CARTS = 50;
+    private const DEFAULT_CHECKOUT_FUNNEL_DEGRADED_DROP_PCT = 10.0;
+    private const DEFAULT_CHECKOUT_FUNNEL_CRITICAL_DROP_PCT = 25.0;
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -271,6 +283,72 @@ class Config
         return $sources ?: self::DEFAULT_APPLIED_PATCHES_SOURCES;
     }
 
+    public function isCheckoutFunnelCheckEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_CHECKOUT_FUNNEL_ENABLED);
+    }
+
+    public function getCheckoutFunnelWindowHours(): int
+    {
+        return $this->positiveInt(
+            $this->scopeConfig->getValue(self::XML_PATH_CHECKOUT_FUNNEL_WINDOW_HOURS),
+            self::DEFAULT_CHECKOUT_FUNNEL_WINDOW_HOURS,
+            168
+        );
+    }
+
+    public function getCheckoutFunnelBaselineDays(): int
+    {
+        return $this->positiveInt(
+            $this->scopeConfig->getValue(self::XML_PATH_CHECKOUT_FUNNEL_BASELINE_DAYS),
+            self::DEFAULT_CHECKOUT_FUNNEL_BASELINE_DAYS,
+            365
+        );
+    }
+
+    public function getCheckoutFunnelMinCarts(): int
+    {
+        return $this->positiveInt(
+            $this->scopeConfig->getValue(self::XML_PATH_CHECKOUT_FUNNEL_MIN_CARTS),
+            self::DEFAULT_CHECKOUT_FUNNEL_MIN_CARTS,
+            1_000_000
+        );
+    }
+
+    public function getCheckoutFunnelDegradedDropPct(): float
+    {
+        return $this->percentage(
+            $this->scopeConfig->getValue(self::XML_PATH_CHECKOUT_FUNNEL_DEGRADED_DROP_PCT),
+            self::DEFAULT_CHECKOUT_FUNNEL_DEGRADED_DROP_PCT
+        );
+    }
+
+    public function getCheckoutFunnelCriticalDropPct(): float
+    {
+        return $this->percentage(
+            $this->scopeConfig->getValue(self::XML_PATH_CHECKOUT_FUNNEL_CRITICAL_DROP_PCT),
+            self::DEFAULT_CHECKOUT_FUNNEL_CRITICAL_DROP_PCT
+        );
+    }
+
+    private function positiveInt(mixed $value, int $default, int $max): int
+    {
+        if (!is_numeric($value)) {
+            return $default;
+        }
+        $int = (int) $value;
+        return $int >= 1 ? min($int, $max) : $default;
+    }
+
+    private function percentage(mixed $value, float $default): float
+    {
+        if (!is_numeric($value)) {
+            return $default;
+        }
+        $float = (float) $value;
+        return $float > 0 && $float <= 100 ? $float : $default;
+    }
+
     public function isCheckEnabled(string $checkName): bool
     {
         return match ($checkName) {
@@ -297,6 +375,7 @@ class Config
             'content_integrity' => $this->isContentIntegrityCheckEnabled(),
             'transactional_email' => $this->isTransactionalEmailCheckEnabled(),
             'applied_patches' => $this->isAppliedPatchesCheckEnabled(),
+            'checkout_funnel' => $this->isCheckoutFunnelCheckEnabled(),
             default => false,
         };
     }

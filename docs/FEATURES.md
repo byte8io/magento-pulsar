@@ -50,7 +50,8 @@ When called with a valid API key, it runs all enabled collectors and returns a J
     "log_errors": { "..." },
     "content_integrity": { "..." },
     "transactional_email": { "..." },
-    "applied_patches": { "..." }
+    "applied_patches": { "..." },
+    "checkout_funnel": { "..." }
   }
 }
 ```
@@ -273,13 +274,15 @@ Monitors log file sizes and error report accumulation.
 |--------|-------------|
 | `debug_logging_enabled` | Whether debug logging is turned on |
 | `log_sizes_mb` | Size in MB of `exception.log`, `system.log`, `debug.log` |
-| `report_count` | Number of files in `var/report/` (capped at 10,000) |
+| `report_count` | Total files in `var/report/` (capped at 10,000) — informational |
+| `report_count_24h` | Error reports written in the last 24 hours — drives the status |
+| `note` | Housekeeping hint when ≥ 1,000 old reports have accumulated |
 
 **Status:**
-- Critical: any log > 2 GB or > 1,000 report files
-- Degraded: any log > 500 MB, debug logging enabled, or > 100 report files
+- Critical: any log > 2 GB or > 200 error reports in the last 24 h
+- Degraded: any log > 500 MB, debug logging enabled, or > 50 error reports in the last 24 h
 
-**Why it matters:** Runaway logging fills disks. Debug logging in production generates massive files and degrades performance. A growing `var/report/` directory indicates unhandled exceptions.
+**Why it matters:** Runaway logging fills disks. Debug logging in production generates massive files and degrades performance. A burst of fresh error reports means customers are hitting unhandled exceptions *now*; a large but stale `var/report/` only means nobody has cleaned up, so it no longer colours the status.
 
 ---
 
@@ -407,14 +410,16 @@ Monitors third-party integration health and OAuth token status.
 
 Detects sales confirmation emails (order, invoice, shipment, creditmemo) that were requested but never handed to the mail transport. Looks at a trailing 48-hour window, ignoring entities younger than 30 minutes so in-flight async sends are never flagged.
 
+Magento 2.4.7+ keeps `email_sent` as an **attempt counter**, not a flag: `NULL` = queued (async) or failed-with-no-retry (sync); `-3 … -1` = attempts remaining, the async cron retries these; `0` = every attempt failed, Magento has given up; `1` = sent.
+
 | Metric | Description |
 |--------|-------------|
-| `order_unsent` | Orders with `send_email = 1` and `email_sent IS NULL` (permanently lost) |
+| `order_unsent` | Orders Magento will never email: `email_sent = 0`, plus `email_sent IS NULL` when async sending is off |
 | `invoice_unsent` | Same for invoices |
 | `shipment_unsent` | Same for shipments |
 | `creditmemo_unsent` | Same for credit memos |
-| `pending_retry` | Entities queued for the async send cron (`email_sent = 0`) past the grace period |
-| `oldest_unsent_minutes` | Age of the oldest unsent/pending entity in the window |
+| `pending_retry` | Entities the async cron is still retrying (`NULL` or negative) past the grace period |
+| `oldest_pending_minutes` | Age of the oldest entity still being retried |
 | `async_enabled` | Value of `sales_email/general/async_sending` |
 | `sample_increment_ids` | Up to 10 order increment IDs with lost confirmations (newest first), for manual resend |
 
@@ -422,7 +427,7 @@ Detects sales confirmation emails (order, invoice, shipment, creditmemo) that we
 - Critical: ≥ 5 permanently lost emails, or an async retry backlog stuck > 2 hours
 - Degraded: any permanently lost email, or an async backlog waiting > 30 minutes
 
-**Why it matters:** When emails are sent synchronously (`async_sending` off) and the SMTP server times out during checkout, the exception is thrown *after* the order is saved — `email_sent` stays `NULL`. Magento's retry cron only re-sends `email_sent = 0`, so `NULL` rows are invisible to it: the confirmation is silently lost for good, and nobody notices until a customer complains weeks later. The collector distinguishes these permanent losses from a normal async retry backlog, and escalates harder when the async safety net is off.
+**Why it matters:** An SMTP outage during checkout costs confirmations either way. With async sending off the exception fires *after* the order is saved and nothing retries it. With async sending on, the cron retries three times and then writes `email_sent = 0` and moves on — the customer still gets nothing, and nobody notices until they complain weeks later. The collector reports exactly the rows Magento has abandoned, separately from the ones it is still working on, so "pending" really means pending. Resend lost confirmations manually (e.g. `n98-magerun2 sys:…` / `utils:send:email`, or re-queue by setting `email_sent = NULL` with async on).
 
 **Edge cases:** Canceled orders are excluded (they legitimately get no confirmation). Missing sales tables report zero. Rows older than the 48-hour window age out so a handled incident doesn't pin the collector red.
 
@@ -555,16 +560,44 @@ Inventories the security patches a store *declares* and verifies each is actuall
 | `identifiers` | Patch identifiers verified present in code |
 | `declared_identifiers` | Patch identifiers the store declares |
 | `patches` | Per-patch detail: file, identifiers, sources, package, verification result |
-| `summary` | Counts of `applied` / `not_applied` / `partial` / `target_missing` / `unknown` |
+| `summary` | Counts of `applied` / `superseded` / `not_applied` / `partial` / `target_missing` / `unreferenced` / `unknown` |
 | `patch_dirs` | Directories scanned for `.patch`/`.diff` files |
+| `note` | Housekeeping hint when unreferenced patch files are found |
 
 **Status:**
-- Degraded: a declared patch is not applied, partially applied, or its target file is missing
-- Healthy: all declared patches verified present
+- Degraded: a declared patch is not applied or only partially applied, and no newer patch covers the same file
+- Healthy: every patch is applied or superseded by a newer applied patch
+
+A patch whose hunks are gone but whose files are all covered by another *applied* patch is `superseded` (Adobe's cumulative monthly patches rewrite the same `Escaper.php`); its advisory identifiers still count as mitigated. A `.patch` file found only by the directory scan, declared by nothing, matching no file is `unreferenced` — stale housekeeping, not a lost fix. Hunks against composer's `vendor/bin/*` proxies are ignored.
 
 Declared patches are read from `composer.json`, `vendor/composer/installed.json`, and `.patch`/`.diff` files — configurable via `applied_patches_sources` and `applied_patches_dirs`.
 
 **Why it matters:** Applying a patch and keeping it applied are different things. A `composer update` can quietly pull a package version that drops the fix, re-opening a CVE with no obvious signal.
+
+---
+
+### Checkout Funnel
+
+Measures how many carts reach a chosen shipping method and how many of those become orders, and compares the trailing window with the store's own baseline. This is the collector for the class of incident a synthetic checkout flow cannot see: the storefront is up, the flow passes, and yet one shopper in eight silently gives up at the shipping step because an age gate, a carrier rate call or an address validator misbehaves for *their* input.
+
+| Metric | Description |
+|--------|-------------|
+| `carts` | Quotes created in the window with at least one item |
+| `shipping_completed` | Of those, quotes whose shipping address carries a `shipping_method` |
+| `orders` | Orders placed in the window |
+| `cart_to_shipping_pct` / `shipping_to_order_pct` / `cart_to_order_pct` | Current stage conversion rates |
+| `baseline_*_pct` | The same rates over the baseline period |
+| `worst_stage` / `worst_stage_drop_pct` | The stage driving the status and its relative drop |
+| `sample_sufficient` / `baseline_sufficient` | Whether there was enough traffic to judge |
+| `stages` | Per-stage detail incl. z-score |
+| `window_hours` / `baseline_days` | Effective settings |
+
+**Status:**
+- Critical: a stage ≥ 25 % below baseline (relative) with z ≥ 3
+- Degraded: a stage ≥ 10 % below baseline (relative) with z ≥ 2
+- Healthy with a note: fewer than 50 carts in the window, or the baseline is still building
+
+**Why it matters:** A synthetic test proves the checkout works for one fixture address; it cannot see a partial failure. Real case: a German store's cart → shipping completion fell from 75–80 % to 66 % for two days while PayPal, the error logs, the checkout page and the age-verification script all reported fine. The funnel is the only signal that moves when customers, not robots, fail.
 
 ---
 

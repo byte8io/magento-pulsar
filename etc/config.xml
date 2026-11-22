@@ -42,6 +42,12 @@
                 <applied_patches_enabled>1</applied_patches_enabled>
                 <applied_patches_dirs/>
                 <applied_patches_sources>composer_json,installed_json,patch_dirs</applied_patches_sources>
+                <checkout_funnel_enabled>1</checkout_funnel_enabled>
+                <checkout_funnel_window_hours>24</checkout_funnel_window_hours>
+                <checkout_funnel_baseline_days>28</checkout_funnel_baseline_days>
+                <checkout_funnel_min_carts>50</checkout_funnel_min_carts>
+                <checkout_funnel_degraded_drop_pct>10</checkout_funnel_degraded_drop_pct>
+                <checkout_funnel_critical_drop_pct>25</checkout_funnel_critical_drop_pct>
             </checks>
             <signature_feed>
                 <enabled>1</enabled>

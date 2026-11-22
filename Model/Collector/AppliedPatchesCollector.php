@@ -97,6 +97,22 @@ class AppliedPatchesCollector implements CollectorInterface
      */
     private function buildResult(string $root, array $dirs, array $entries): array
     {
+        // Pass 1: verify every patch and remember which live files are covered
+        // by a patch that verifies applied. Pass 2 uses that to tell a lost fix
+        // from one that merely lives on in a newer patch.
+        $verifications = [];
+        $appliedTargets = [];
+        foreach ($entries as $ref => $entry) {
+            $verification = $this->verifyEntry($root, $entry);
+            $verifications[$ref] = $verification;
+            foreach ($verification['files'] as $path => $fileResult) {
+                $target = $verification['targets'][$path] ?? null;
+                if ($fileResult === PatchVerifier::RESULT_APPLIED && $target !== null) {
+                    $appliedTargets[$target] = true;
+                }
+            }
+        }
+
         $patches = [];
         $verifiedIdentifiers = [];
         $declaredIdentifiers = [];
@@ -104,18 +120,22 @@ class AppliedPatchesCollector implements CollectorInterface
             PatchVerifier::RESULT_APPLIED => 0,
             PatchVerifier::RESULT_NOT_APPLIED => 0,
             PatchVerifier::RESULT_PARTIAL => 0,
+            PatchVerifier::RESULT_SUPERSEDED => 0,
             PatchVerifier::RESULT_TARGET_MISSING => 0,
+            PatchVerifier::RESULT_UNREFERENCED => 0,
             PatchVerifier::RESULT_UNKNOWN => 0,
         ];
         $status = self::STATUS_HEALTHY;
 
         foreach ($entries as $ref => $entry) {
-            $verification = $this->verifyEntry($root, $entry);
+            $verification = $this->classify($entry, $verifications[$ref], $appliedTargets);
             $identifiers = array_values(array_unique($entry['identifiers']));
 
             foreach ($identifiers as $id) {
                 $declaredIdentifiers[$id] = true;
-                if ($verification === PatchVerifier::RESULT_APPLIED) {
+                // A superseded patch's fix is live in its newer form, so the
+                // advisories it names are still mitigated.
+                if (in_array($verification, [PatchVerifier::RESULT_APPLIED, PatchVerifier::RESULT_SUPERSEDED], true)) {
                     $verifiedIdentifiers[$id] = true;
                 }
             }
@@ -139,7 +159,7 @@ class AppliedPatchesCollector implements CollectorInterface
             ];
         }
 
-        return [
+        $result = [
             'status' => $status,
             'identifiers' => array_keys($verifiedIdentifiers),
             'declared_identifiers' => array_keys($declaredIdentifiers),
@@ -149,26 +169,83 @@ class AppliedPatchesCollector implements CollectorInterface
                 'applied' => $summary[PatchVerifier::RESULT_APPLIED],
                 'not_applied' => $summary[PatchVerifier::RESULT_NOT_APPLIED],
                 'partial' => $summary[PatchVerifier::RESULT_PARTIAL],
+                'superseded' => $summary[PatchVerifier::RESULT_SUPERSEDED],
                 'target_missing' => $summary[PatchVerifier::RESULT_TARGET_MISSING],
+                'unreferenced' => $summary[PatchVerifier::RESULT_UNREFERENCED],
                 'unknown' => $summary[PatchVerifier::RESULT_UNKNOWN],
             ],
             'patch_dirs' => $dirs,
         ];
+
+        if ($summary[PatchVerifier::RESULT_UNREFERENCED] > 0) {
+            $result['note'] = sprintf(
+                '%d archived patch file(s) are not declared anywhere and match no file in this install — '
+                . 'leftovers from a previous version or a removed module. Move them out of the patch '
+                . 'directories to keep this inventory meaningful.',
+                $summary[PatchVerifier::RESULT_UNREFERENCED]
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * Refine a raw verification into the inventory-level classification.
+     *
+     * @param array<string, mixed> $entry
+     * @param array{result: string, files: array<string, string>, targets: array<string, ?string>} $verification
+     * @param array<string, true> $appliedTargets live files covered by an applied patch
+     */
+    private function classify(array $entry, array $verification, array $appliedTargets): string
+    {
+        $result = $verification['result'];
+
+        // Directory-scan-only file, declared by nothing, pointing at nothing.
+        if ($result === PatchVerifier::RESULT_TARGET_MISSING
+            && $entry['package'] === null
+            && array_values(array_unique($entry['sources'])) === [self::SOURCE_PATCH_DIRS]
+        ) {
+            return PatchVerifier::RESULT_UNREFERENCED;
+        }
+
+        // Hunks gone, but every file that failed is covered by another patch
+        // that verifies applied — the newer cumulative patch owns it now.
+        if (in_array($result, [PatchVerifier::RESULT_NOT_APPLIED, PatchVerifier::RESULT_PARTIAL], true)) {
+            $failed = array_keys(array_filter(
+                $verification['files'],
+                static fn (string $r): bool => $r !== PatchVerifier::RESULT_APPLIED
+            ));
+            if ($failed === []) {
+                return $result;
+            }
+            foreach ($failed as $path) {
+                $target = $verification['targets'][$path] ?? null;
+                if ($target === null || !isset($appliedTargets[$target])) {
+                    return $result;
+                }
+            }
+            return PatchVerifier::RESULT_SUPERSEDED;
+        }
+
+        return $result;
     }
 
     /**
      * @param array<string, mixed> $entry
+     * @return array{result: string, files: array<string, string>, targets: array<string, ?string>}
      */
-    private function verifyEntry(string $root, array $entry): string
+    private function verifyEntry(string $root, array $entry): array
     {
+        $unknown = ['result' => PatchVerifier::RESULT_UNKNOWN, 'files' => [], 'targets' => []];
+
         $abs = $entry['abs'];
         if ($abs === null || !is_file($abs)) {
             // Remote URL patch or referenced file missing — nothing to diff against.
-            return PatchVerifier::RESULT_UNKNOWN;
+            return $unknown;
         }
         $contents = @file_get_contents($abs, false, null, 0, self::MAX_PATCH_BYTES);
         if ($contents === false) {
-            return PatchVerifier::RESULT_UNKNOWN;
+            return $unknown;
         }
 
         $baseDirs = [$root];
@@ -176,7 +253,7 @@ class AppliedPatchesCollector implements CollectorInterface
             $baseDirs[] = $root . '/vendor/' . $entry['package'];
         }
 
-        return $this->verifier->verify($contents, $baseDirs)['result'];
+        return $this->verifier->verify($contents, $baseDirs);
     }
 
     private function collectFromComposerJson(string $root, array &$entries): void

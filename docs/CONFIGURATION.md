@@ -86,8 +86,9 @@ Each collector can be independently enabled or disabled. All are enabled by defa
 | **Content Integrity Status** | `content_integrity` | Injected skimmer / obfuscated JS in `core_config_data` and CMS content |
 | **Transactional Email Monitoring** | `transactional_email` | Order/invoice/shipment/creditmemo emails requested but never sent |
 | **Applied Patches Status** | `applied_patches` | Declared security patches verified present in live code |
+| **Checkout Funnel Monitoring** | `checkout_funnel` | Cart → shipping method → order conversion vs the store's own baseline |
 
-There are **23 collectors** in total. Disabling a collector means it will not be included in the health response at all. The overall status is computed only from enabled collectors.
+There are **24 collectors** in total. Disabling a collector means it will not be included in the health response at all. The overall status is computed only from enabled collectors.
 
 > Some collectors can report a fourth status, **`compromised`** (tamper evidence — e.g. a webshell or injected skimmer), which is surfaced as a security event distinct from the uptime axis. It is produced by `media_integrity`, `content_integrity`, and `upload_endpoint`.
 
@@ -256,10 +257,12 @@ bin/magento deploy:mode:set production
 | Condition | Status |
 |-----------|--------|
 | Any log file > 2 GB | Critical |
-| > 1,000 files in `var/report/` | Critical |
+| > 200 error reports written to `var/report/` in the last 24 h | Critical |
 | Any log file > 500 MB | Degraded |
 | Debug logging enabled | Degraded |
-| > 100 files in `var/report/` | Degraded |
+| > 50 error reports written to `var/report/` in the last 24 h | Degraded |
+
+Only *recent* reports drive the status — an error storm from months ago no longer keeps the collector amber. The total on disk is still reported (`report_count`) and, past 1,000 files, the collector adds a housekeeping note.
 
 **Troubleshooting:** Rotate large logs:
 
@@ -497,10 +500,45 @@ Inventories security patches the store *declares* (composer.json, `vendor/compos
 
 | Condition | Status |
 |-----------|--------|
-| A declared patch is not applied / partially applied / its target file is missing | Degraded |
-| All declared patches verified present | Healthy |
+| A declared patch is not applied or only partially applied | Degraded |
+| All declared patches verified present (or superseded by a newer applied patch) | Healthy |
 
-Configurable via **Applied Patches Directories** (`applied_patches_dirs`, default `patches`) and **Applied Patches Sources** (`applied_patches_sources` — any of `composer_json`, `installed_json`, `patch_dirs`). The summary reports counts for `applied` / `not_applied` / `partial` / `target_missing` / `unknown`. This catches a CVE patch silently reverted by a `composer update` or redeploy.
+Configurable via **Applied Patches Directories** (`applied_patches_dirs`, default `patches`) and **Applied Patches Sources** (`applied_patches_sources` — any of `composer_json`, `installed_json`, `patch_dirs`). This catches a CVE patch silently reverted by a `composer update` or redeploy.
+
+Each patch is classified as one of:
+
+| Verification | Meaning | Affects status |
+|---|---|---|
+| `applied` | Every hunk present in the live file | — |
+| `superseded` | Hunks gone, but a newer patch in the inventory touching the same file is applied (Adobe's cumulative monthly patches rewrite the same files) — the fix lives on in its newer form | — |
+| `partial` / `not_applied` | Hunks missing from the live file and nothing else covers it — the fix was lost | Degraded |
+| `target_missing` | A declared patch whose target file does not exist in this install | — |
+| `unreferenced` | A `.patch` file found by the directory scan that nothing declares and that matches no file — a leftover from a previous version or a removed module. The collector adds a housekeeping note; move these files out of the patch directories | — |
+| `unknown` | Remote URL patch, unreadable file, or a diff with no verifiable lines | — |
+
+Hunks against composer's `vendor/bin/*` proxies are ignored; composer regenerates those on every install.
+
+### Checkout Funnel — Thresholds
+
+Compares the trailing window's conversion with the store's own baseline, per stage:
+
+| Stage | Measured as |
+|---|---|
+| cart → shipping method chosen | quotes with items whose shipping address carries a `shipping_method` |
+| shipping method chosen → order placed | orders / quotes with a shipping method |
+| cart → order placed | orders / carts (composite; never named as the worst stage when an adjacent one explains it) |
+
+| Condition | Status |
+|-----------|--------|
+| A stage's rate ≥ **25 %** below baseline (relative) and z ≥ 3 | Critical |
+| A stage's rate ≥ **10 %** below baseline (relative) and z ≥ 2 | Degraded |
+| Fewer than **50** carts in the window, or baseline under 10× that | Healthy, with a note |
+
+"Relative" means 78 % → 70 % is a 10 % drop. The z-score (two-proportion test) stops thin traffic from paging: a 12-point drop on 30 carts is weather, the same drop on 300 carts is an incident.
+
+Settings: **Window (hours)** `checkout_funnel_window_hours` (24), **Baseline (days)** `checkout_funnel_baseline_days` (28 — keep below *Sales › Checkout › Quote Lifetime*, default 30 days, or the baseline shrinks as quotes are purged), **Minimum Carts per Window** `checkout_funnel_min_carts` (50), **Degraded / Critical at Relative Drop (%)** `checkout_funnel_degraded_drop_pct` (10) / `checkout_funnel_critical_drop_pct` (25).
+
+The collector reads `quote`, `quote_address` and `sales_order` only. `quote.created_at` is unindexed, so the window is first narrowed to an `entity_id` lower bound found by binary search on the primary key; results are cached for 5 minutes (window) and 6 hours (baseline), so polling frequency does not add load.
 
 ### PHP-FPM — Thresholds (off by default)
 

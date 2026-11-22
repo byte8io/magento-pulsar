@@ -235,6 +235,46 @@
                         <field id="applied_patches_enabled">1</field>
                     </depends>
                 </field>
+                <field id="checkout_funnel_enabled" translate="label comment" type="select" sortOrder="240" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Checkout Funnel Monitoring</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Measures how many carts reach a chosen shipping method and how many of those become orders, and compares the trailing window against the store's own baseline. Catches the "site is up, checks pass, but customers quietly give up at the shipping step" class of incident — an age gate, carrier rate call or address validator failing for a subset of shoppers. Reads quote, quote_address and sales_order only; results are cached (5 min window / 6 h baseline).]]></comment>
+                </field>
+                <field id="checkout_funnel_window_hours" translate="label comment" type="text" sortOrder="241" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Window (hours)</label>
+                    <comment>Trailing period whose conversion is compared with the baseline (default: 24). Shorter windows react faster but need more traffic.</comment>
+                    <depends>
+                        <field id="checkout_funnel_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="checkout_funnel_baseline_days" translate="label comment" type="text" sortOrder="242" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Baseline (days)</label>
+                    <comment>How much history before the window forms the baseline (default: 28). Keep it below your quote lifetime (Sales › Checkout › Quote Lifetime, default 30 days) or the baseline shrinks.</comment>
+                    <depends>
+                        <field id="checkout_funnel_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="checkout_funnel_min_carts" translate="label comment" type="text" sortOrder="243" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Minimum Carts per Window</label>
+                    <comment>Below this many carts in the window the collector reports healthy with a note instead of judging conversion (default: 50).</comment>
+                    <depends>
+                        <field id="checkout_funnel_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="checkout_funnel_degraded_drop_pct" translate="label comment" type="text" sortOrder="244" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Degraded at Relative Drop (%)</label>
+                    <comment>A stage becomes degraded when its conversion rate is at least this much below baseline, relative (default: 10 — e.g. 78% → 70%), and the drop is statistically significant (z ≥ 2).</comment>
+                    <depends>
+                        <field id="checkout_funnel_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="checkout_funnel_critical_drop_pct" translate="label comment" type="text" sortOrder="245" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Critical at Relative Drop (%)</label>
+                    <comment>A stage becomes critical at this relative drop (default: 25 — e.g. 78% → 58%) with z ≥ 3.</comment>
+                    <depends>
+                        <field id="checkout_funnel_enabled">1</field>
+                    </depends>
+                </field>
             </group>
             <group id="signature_feed" translate="label" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
                 <label>Detection Signature Feed</label>

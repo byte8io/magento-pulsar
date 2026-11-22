@@ -20,6 +20,29 @@ class PatchVerifier
     public const RESULT_TARGET_MISSING = 'target_missing';
     public const RESULT_UNKNOWN = 'unknown';
 
+    /**
+     * Inventory-level classifications assigned by AppliedPatchesCollector after
+     * verification; never returned by verify() itself.
+     *
+     * - unreferenced: an archived .patch file nothing declares (not in
+     *   composer.json / installed.json) whose relative paths resolve nowhere —
+     *   almost always a leftover from a previous Magento major or a removed
+     *   module. Housekeeping, not a missing fix.
+     * - superseded: the patch's hunks are gone from the live file, but a newer
+     *   patch in the same inventory touching that file verifies applied —
+     *   e.g. Adobe's cumulative monthly patches rewriting the same Escaper.php.
+     *   The fix is present in its newer form.
+     */
+    public const RESULT_UNREFERENCED = 'unreferenced';
+    public const RESULT_SUPERSEDED = 'superseded';
+
+    /**
+     * Patch targets that are never verifiable: composer regenerates these
+     * binary proxies on every install, so a patch hunk against them says
+     * nothing about whether the fix is live.
+     */
+    private const IGNORED_TARGET_PREFIXES = ['vendor/bin/', 'bin/'];
+
     private const MIN_DISTINCTIVE_LENGTH = 8;
     private const MIN_ALNUM_CHARS = 3;
     private const MAX_TARGET_BYTES = 2097152; // 2 MB
@@ -30,6 +53,10 @@ class PatchVerifier
     }
 
     /**
+     * Returns the aggregate result, the per-file result keyed by patch path, and
+     * the resolved live-tree target per patch path (null when missing) so the
+     * caller can relate patches that touch the same file.
+     *
      * @param string[] $baseDirs Candidate roots the patch paths may be relative to,
      *                           tried in order (e.g. Magento root, then vendor/<package>)
      * @return array{result: string, files: array<string, string>}
@@ -42,19 +69,38 @@ class PatchVerifier
         }
 
         $fileResults = [];
+        $targets = [];
         foreach ($files as $path => $changes) {
-            $fileResults[$path] = $this->verifyFile($path, $changes, $baseDirs);
+            if ($this->isIgnoredTarget($path)) {
+                continue;
+            }
+            $target = $this->resolveTarget($path, $baseDirs);
+            $fileResults[$path] = $this->verifyFile($target, $changes);
+            $targets[$path] = $target;
         }
 
-        return ['result' => $this->aggregate($fileResults), 'files' => $fileResults];
+        return [
+            'result' => $this->aggregate($fileResults),
+            'files' => $fileResults,
+            'targets' => $targets,
+        ];
+    }
+
+    private function isIgnoredTarget(string $path): bool
+    {
+        foreach (self::IGNORED_TARGET_PREFIXES as $prefix) {
+            if (str_starts_with($path, $prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
      * @param array{added: string[], removed: string[]} $changes
      */
-    private function verifyFile(string $path, array $changes, array $baseDirs): string
+    private function verifyFile(?string $target, array $changes): string
     {
-        $target = $this->resolveTarget($path, $baseDirs);
         if ($target === null) {
             return self::RESULT_TARGET_MISSING;
         }

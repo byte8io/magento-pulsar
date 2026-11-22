@@ -32,7 +32,8 @@ The extension is intentionally simple: it exposes a single secure JSON endpoint,
 | Collector | Catches |
 |---|---|
 | `orders` | Order-flow anomalies (the "site is up but nobody can buy" class), incl. deferred-capture orders shipped but never captured (opt-in) |
-| `transactional_email` | Silently unsent order/invoice emails — losses that a retry cron never sees |
+| `transactional_email` | Order/invoice emails Magento has given up on (retries exhausted, or no retry at all) — the silent losses a merchant only hears about from the customer |
+| `checkout_funnel` | Conversion drop at a checkout step — cart → shipping method → order, compared with the store's own baseline; catches the "site is up, checks pass, customers quietly give up at the shipping step" incident that no synthetic flow sees |
 | `integrations` | Broken API integrations |
 
 **Security posture**
@@ -43,7 +44,7 @@ The extension is intentionally simple: it exposes a single secure JSON endpoint,
 | `config_hygiene` | Risky configuration drift |
 | `content_integrity` | Injected scripts / payment skimmers in CMS content and store config (signature feed kept fresh via cron) |
 | `media_integrity` / `upload_endpoint` | Executable files in media, exposed upload endpoints |
-| `applied_patches` | Verifies security patches are actually present in live code — so version-matched CVE alerts from Pulsar reflect your *patched* reality, and alert again if a patch disappears after a deploy |
+| `applied_patches` | Verifies security patches are actually present in live code — so version-matched CVE alerts from Pulsar reflect your *patched* reality, and alert again if a patch disappears after a deploy. Tells a lost fix apart from a patch superseded by a newer cumulative one, and from stale `.patch` files nothing declares |
 
 Every collector is individually toggleable with tunable thresholds, and reports `healthy` / `degraded` / `critical`; the endpoint's top-level status is the worst across enabled collectors.
 

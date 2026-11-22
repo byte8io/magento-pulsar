@@ -11,15 +11,21 @@ use Magento\Framework\App\ResourceConnection;
  * Watches sales transactional emails (order / invoice / shipment / creditmemo
  * confirmations) that were requested but never handed to the mail transport.
  *
- * Two distinct failure states, distinguished by the email_sent flag:
+ * Magento 2.4.7+ uses email_sent as an attempt counter, not a flag
+ * (Magento\Sales\Model\EmailSenderHandler::sendEmails):
  *
- * - email_sent IS NULL with send_email = 1: the synchronous send threw (e.g.
- *   SMTP timeout) after the entity was saved. Magento's retry cron only picks
- *   up email_sent = 0, so NULL is a PERMANENT silent loss — the customer never
- *   gets the confirmation and nothing ever retries it.
- * - email_sent = 0: queued for the async sales_send_order_emails cron. Normal
- *   for a few minutes when async sending is on; a backlog older than the
- *   thresholds means the cron or the SMTP transport is failing.
+ *   NULL        async on:  queued, the send cron has not tried yet
+ *               async off: the synchronous send threw after save — nothing
+ *                          will ever retry it
+ *   -N … -1     async on:  N attempts left; the cron retries these
+ *   0           every attempt failed (async) — Magento has GIVEN UP.
+ *               Also the legacy "send failed" value from older releases.
+ *   1           sent
+ *
+ * So a permanent loss is email_sent = 0, plus email_sent IS NULL when async
+ * sending is off. A pending retry is NULL or negative with async on. Earlier
+ * module versions had this backwards (0 = "pending retry") and told merchants
+ * Magento would still retry confirmations it had already abandoned.
  */
 class TransactionalEmailCollector implements CollectorInterface
 {
@@ -27,7 +33,7 @@ class TransactionalEmailCollector implements CollectorInterface
 
     /**
      * Ignore entities younger than this so an in-flight async send (queued,
-     * cron not yet run) is never flagged.
+     * cron not yet run, or mid-retry) is never flagged.
      */
     private const GRACE_MINUTES = 30;
 
@@ -35,7 +41,8 @@ class TransactionalEmailCollector implements CollectorInterface
      * Only look back this far. Older stuck rows are legacy data the operator
      * already knows about (or never will act on); a trailing window also means
      * an incident ages out of the alert once handled instead of pinning the
-     * collector red forever.
+     * collector red forever. An alert that stays red for a week therefore
+     * means the transport is still failing, not that old rows linger.
      */
     private const WINDOW_HOURS = 48;
 
@@ -66,6 +73,7 @@ class TransactionalEmailCollector implements CollectorInterface
     {
         try {
             $connection = $this->resourceConnection->getConnection();
+            $asyncEnabled = $this->scopeConfig->isSetFlag(self::XML_PATH_ASYNC_SENDING);
 
             $windowStart = (new \DateTime())
                 ->modify(sprintf('-%d hours', self::WINDOW_HOURS))
@@ -74,9 +82,11 @@ class TransactionalEmailCollector implements CollectorInterface
                 ->modify(sprintf('-%d minutes', self::GRACE_MINUTES))
                 ->format('Y-m-d H:i:s');
 
+            [$lostExpr, $pendingExpr] = $this->classificationSql($asyncEnabled);
+
             $lostByEntity = [];
             $pendingTotal = 0;
-            $oldestUnsent = null;
+            $oldestPending = null;
 
             foreach (self::ENTITY_TABLES as $entity => $table) {
                 $tableName = $this->resourceConnection->getTableName($table);
@@ -91,13 +101,16 @@ class TransactionalEmailCollector implements CollectorInterface
                 $row = $connection->fetchRow(
                     sprintf(
                         'SELECT
-                            COALESCE(SUM(email_sent IS NULL), 0) AS lost,
-                            COALESCE(SUM(email_sent = 0), 0) AS pending,
-                            MIN(created_at) AS oldest
+                            COALESCE(SUM(%s), 0) AS lost,
+                            COALESCE(SUM(%s), 0) AS pending,
+                            MIN(CASE WHEN %s THEN created_at END) AS oldest_pending
                         FROM %s
                         WHERE send_email = 1
-                            AND (email_sent IS NULL OR email_sent = 0)
+                            AND (email_sent IS NULL OR email_sent <= 0)
                             AND created_at BETWEEN :window_start AND :grace_cutoff%s',
+                        $lostExpr,
+                        $pendingExpr,
+                        $pendingExpr,
                         $tableName,
                         $stateFilter
                     ),
@@ -107,23 +120,22 @@ class TransactionalEmailCollector implements CollectorInterface
                 $lostByEntity[$entity] = (int) ($row['lost'] ?? 0);
                 $pendingTotal += (int) ($row['pending'] ?? 0);
 
-                $oldest = $row['oldest'] ?? null;
-                if ($oldest !== null && ($oldestUnsent === null || $oldest < $oldestUnsent)) {
-                    $oldestUnsent = $oldest;
+                $oldest = $row['oldest_pending'] ?? null;
+                if ($oldest !== null && ($oldestPending === null || $oldest < $oldestPending)) {
+                    $oldestPending = $oldest;
                 }
             }
 
             $lostTotal = (int) array_sum($lostByEntity);
-            $asyncEnabled = $this->scopeConfig->isSetFlag(self::XML_PATH_ASYNC_SENDING);
 
-            $oldestMinutes = 0;
-            if ($oldestUnsent !== null) {
-                $oldestMinutes = (int) floor(
-                    ((new \DateTime())->getTimestamp() - (new \DateTime($oldestUnsent))->getTimestamp()) / 60
+            $oldestPendingMinutes = 0;
+            if ($oldestPending !== null) {
+                $oldestPendingMinutes = (int) floor(
+                    ((new \DateTime())->getTimestamp() - (new \DateTime($oldestPending))->getTimestamp()) / 60
                 );
             }
 
-            [$status, $note] = $this->evaluate($lostTotal, $pendingTotal, $oldestMinutes, $asyncEnabled);
+            [$status, $note] = $this->evaluate($lostTotal, $pendingTotal, $oldestPendingMinutes, $asyncEnabled);
 
             $result = [
                 'status' => $status,
@@ -132,13 +144,14 @@ class TransactionalEmailCollector implements CollectorInterface
                 'shipment_unsent' => $lostByEntity['shipment'],
                 'creditmemo_unsent' => $lostByEntity['creditmemo'],
                 'pending_retry' => $pendingTotal,
-                'oldest_unsent_minutes' => $oldestMinutes,
+                'oldest_pending_minutes' => $oldestPendingMinutes,
                 'async_enabled' => $asyncEnabled,
             ];
 
             if ($lostByEntity['order'] > 0) {
                 $result['sample_increment_ids'] = $this->sampleIncrementIds(
                     $connection,
+                    $lostExpr,
                     $windowStart,
                     $graceCutoff
                 );
@@ -157,18 +170,33 @@ class TransactionalEmailCollector implements CollectorInterface
     }
 
     /**
+     * SQL boolean expressions for "permanently lost" and "still being retried",
+     * given the store's async setting. See the class docblock for the state
+     * table these encode.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function classificationSql(bool $asyncEnabled): array
+    {
+        if ($asyncEnabled) {
+            return ['email_sent = 0', '(email_sent IS NULL OR email_sent < 0)'];
+        }
+        // Without the async cron nothing is ever retried: NULL (sync send
+        // threw) and 0 (legacy failure marker) are both final.
+        return ['(email_sent IS NULL OR email_sent = 0)', '0'];
+    }
+
+    /**
      * @return array{0: string, 1: ?string}
      */
-    private function evaluate(int $lostTotal, int $pendingTotal, int $oldestMinutes, bool $asyncEnabled): array
+    private function evaluate(int $lostTotal, int $pendingTotal, int $oldestPendingMinutes, bool $asyncEnabled): array
     {
-        // email_sent NULL is never retried by Magento regardless of the async
-        // setting — every one is a confirmation the customer will not receive.
         if ($lostTotal >= self::LOST_CRITICAL_THRESHOLD) {
             return [
                 self::STATUS_CRITICAL,
                 sprintf(
-                    '%d transactional emails permanently unsent (sync send failed, no retry). '
-                    . 'Check SMTP transport; resend manually.',
+                    '%d transactional emails permanently unsent — Magento has exhausted its retries '
+                    . 'and will not try again. Check the SMTP transport, then resend manually.',
                     $lostTotal
                 ),
             ];
@@ -176,7 +204,7 @@ class TransactionalEmailCollector implements CollectorInterface
 
         if ($lostTotal > 0) {
             $note = sprintf(
-                '%d transactional email(s) permanently unsent (sync send failed, no retry).',
+                '%d transactional email(s) permanently unsent — Magento will not retry them.',
                 $lostTotal
             );
             if (!$asyncEnabled) {
@@ -188,24 +216,24 @@ class TransactionalEmailCollector implements CollectorInterface
 
         // Async backlog: entries the retry cron should have drained by now.
         if ($asyncEnabled && $pendingTotal > 0) {
-            if ($oldestMinutes >= self::PENDING_CRITICAL_MINUTES) {
+            if ($oldestPendingMinutes >= self::PENDING_CRITICAL_MINUTES) {
                 return [
                     self::STATUS_CRITICAL,
                     sprintf(
-                        '%d queued sales emails stuck for %d min — sales_send_order_emails cron '
-                        . 'or SMTP transport is failing.',
+                        '%d queued sales emails still retrying after %d min — sales_send_order_emails cron '
+                        . 'or SMTP transport is failing. Once retries run out they become permanent losses.',
                         $pendingTotal,
-                        $oldestMinutes
+                        $oldestPendingMinutes
                     ),
                 ];
             }
-            if ($oldestMinutes >= self::PENDING_WARNING_MINUTES) {
+            if ($oldestPendingMinutes >= self::PENDING_WARNING_MINUTES) {
                 return [
                     self::STATUS_DEGRADED,
                     sprintf(
                         '%d queued sales emails waiting %d min for the async send cron.',
                         $pendingTotal,
-                        $oldestMinutes
+                        $oldestPendingMinutes
                     ),
                 ];
             }
@@ -222,6 +250,7 @@ class TransactionalEmailCollector implements CollectorInterface
      */
     private function sampleIncrementIds(
         \Magento\Framework\DB\Adapter\AdapterInterface $connection,
+        string $lostExpr,
         string $windowStart,
         string $graceCutoff
     ): array {
@@ -236,12 +265,13 @@ class TransactionalEmailCollector implements CollectorInterface
                 sprintf(
                     "SELECT increment_id FROM %s
                     WHERE send_email = 1
-                        AND email_sent IS NULL
+                        AND %s
                         AND state != 'canceled'
                         AND created_at BETWEEN :window_start AND :grace_cutoff
                     ORDER BY created_at DESC
                     LIMIT %d",
                     $orderTable,
+                    $lostExpr,
                     self::SAMPLE_LIMIT
                 ),
                 ['window_start' => $windowStart, 'grace_cutoff' => $graceCutoff]
