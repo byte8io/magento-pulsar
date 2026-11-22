@@ -54,6 +54,10 @@
                 <endpoint/>
                 <token/>
             </signature_feed>
+            <synthetic>
+                <prune_enabled>1</prune_enabled>
+                <prune_after_hours>1</prune_after_hours>
+            </synthetic>
         </byte8_pulsar>
     </default>
 </config>

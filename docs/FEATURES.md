@@ -599,6 +599,24 @@ Measures how many carts reach a chosen shipping method and how many of those bec
 
 **Why it matters:** A synthetic test proves the checkout works for one fixture address; it cannot see a partial failure. Real case: a German store's cart → shipping completion fell from 75–80 % to 66 % for two days while PayPal, the error logs, the checkout page and the age-verification script all reported fine. The funnel is the only signal that moves when customers, not robots, fail.
 
+Pulsar's own synthetic checkout runs are excluded: quotes and orders whose `customer_email` is on the synthetic domain (below) never count as carts, so the flow's cadence cannot move the funnel.
+
+---
+
+### Synthetic Checkout Traffic
+
+Not a collector — the module's side of Pulsar's browser-based checkout flow. Every flow run adds a product to cart as a fresh guest; with the *shipping step* enabled it also types a fixture address and waits for carrier rates. That leaves traces on the store, and this module makes them recognisable and harmless.
+
+| Piece | What it does |
+|-------|--------------|
+| `X-Pulsar-Synthetic: <site id>` request header | Sent on every request of a run. |
+| `Byte8\Pulsar\Api\IsSyntheticRequestInterface` | Inject it to skip calls that should not fire for monitoring traffic: age/ID verification SDKs, fraud scoring, ERP cart sync, marketing automation. |
+| Quote tagging (`sales_quote_save_before`) | Every quote a run touches gets `customer_email = pulsar+<site id>@synthetic.byte8.io` from the first add-to-cart on, so even the base flow's anonymous carts are identifiable. Logged-in customers are never touched. |
+| Pruning cron (`byte8_pulsar_prune_synthetic_quotes`, hourly) | Deletes synthetic quotes older than *Delete After* (default 1 h) in batches of 500; `quote_item` and `quote_address` follow by foreign key. |
+| Funnel exclusion | The Checkout Funnel collector ignores synthetic quotes and orders. |
+
+**What the merchant still has to do:** exclude `pulsar+<site id>@synthetic.byte8.io` (or the whole `@synthetic.byte8.io` domain) in Klaviyo, Mailchimp, Dotdigital and any abandoned-cart or analytics tool keyed on the shopper email. The site id is shown in the Pulsar dashboard's checkout-flow card.
+
 ---
 
 ### PHP-FPM

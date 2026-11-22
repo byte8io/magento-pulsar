@@ -538,7 +538,20 @@ Compares the trailing window's conversion with the store's own baseline, per sta
 
 Settings: **Window (hours)** `checkout_funnel_window_hours` (24), **Baseline (days)** `checkout_funnel_baseline_days` (28 — keep below *Sales › Checkout › Quote Lifetime*, default 30 days, or the baseline shrinks as quotes are purged), **Minimum Carts per Window** `checkout_funnel_min_carts` (50), **Degraded / Critical at Relative Drop (%)** `checkout_funnel_degraded_drop_pct` (10) / `checkout_funnel_critical_drop_pct` (25).
 
-The collector reads `quote`, `quote_address` and `sales_order` only. `quote.created_at` is unindexed, so the window is first narrowed to an `entity_id` lower bound found by binary search on the primary key; results are cached for 5 minutes (window) and 6 hours (baseline), so polling frequency does not add load.
+The collector reads `quote`, `quote_address` and `sales_order` only. `quote.created_at` is unindexed, so the window is first narrowed to an `entity_id` lower bound found by binary search on the primary key; results are cached for 5 minutes (window) and 6 hours (baseline), so polling frequency does not add load. Quotes and orders carrying the synthetic shopper email (next section) are excluded.
+
+### Synthetic Checkout Traffic
+
+**Stores › Configuration › Byte8 › Pulsar › Synthetic Checkout Traffic**
+
+Pulsar's checkout flow runs against the storefront as a guest and, with its shipping step enabled, types a fixture address. The module tags every quote such a run touches with `pulsar+<site id>@synthetic.byte8.io` and removes them again:
+
+| Setting | Path | Default | Meaning |
+|---|---|---|---|
+| Delete Synthetic Quotes | `byte8_pulsar/synthetic/prune_enabled` | Yes | Hourly cron deletes tagged quotes |
+| Delete After (hours) | `byte8_pulsar/synthetic/prune_after_hours` | 1 (max 168) | Minimum age since the quote's last update |
+
+No setting is needed for the request marker or the quote tagging; both are always on while the module is enabled. To short-circuit third-party calls for synthetic runs, inject `Byte8\Pulsar\Api\IsSyntheticRequestInterface` and check `execute()` before calling out.
 
 ### PHP-FPM — Thresholds (off by default)
 

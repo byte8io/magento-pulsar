@@ -34,4 +34,9 @@
         </arguments>
     </type>
 
+    <!-- Synthetic-traffic contract: stores and third-party modules inject the
+         interface to recognise Pulsar checkout runs (X-Pulsar-Synthetic). -->
+    <preference for="Byte8\Pulsar\Api\IsSyntheticRequestInterface"
+                type="Byte8\Pulsar\Model\Synthetic\IsSyntheticRequest"/>
+
 </config>

@@ -8,5 +8,11 @@
              method="execute">
             <schedule>17 * * * *</schedule>
         </job>
+        <!-- Delete the quotes Pulsar's synthetic checkout runs leave behind. -->
+        <job name="byte8_pulsar_prune_synthetic_quotes"
+             instance="Byte8\Pulsar\Cron\PruneSyntheticQuotes"
+             method="execute">
+            <schedule>41 * * * *</schedule>
+        </job>
     </group>
 </config>

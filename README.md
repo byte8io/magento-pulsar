@@ -8,7 +8,7 @@ Deep health monitoring for Magento 2. This is the companion extension for **[Byt
 
 The extension is intentionally simple: it exposes a single secure JSON endpoint, `GET /pulsar/health`, that runs the enabled collectors and reports per-check status. The Pulsar service polls it on an interval, tracks history, applies alerting rules (with flap suppression and digests), and notifies your team — nothing long-lived runs on your server.
 
-## What it watches — 23 collectors
+## What it watches — 24 collectors
 
 **Infrastructure & platform**
 
@@ -83,7 +83,7 @@ Full field-by-field reference: [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) 
 ┌──────────────────────┐   poll /pulsar/health    ┌─────────────────────┐
 │  Pulsar service      │ ───────────────────────► │  Magento 2          │
 │  pulsar.byte8.io     │      (X-Pulsar-Key)      │  (this module:      │
-│  history · alerting  │ ◄─────────────────────── │   23 collectors)    │
+│  history · alerting  │ ◄─────────────────────── │   24 collectors)    │
 │  advisories · digests│        JSON status       │                     │
 └──────────┬───────────┘                          └─────────────────────┘
            │ alerts: email · Slack · webhooks
@@ -92,6 +92,16 @@ Full field-by-field reference: [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) 
 ```
 
 The service side adds what a module can't: uptime/synthetic checks from outside, alert history, flap suppression, security-advisory matching against your exact Magento version *and* applied patches, and multi-site dashboards.
+
+### Synthetic checkout traffic
+
+Pulsar's browser-based checkout flow runs against your storefront as a guest shopper. The module makes those runs recognisable and tidies up after them:
+
+- every request of a run carries `X-Pulsar-Synthetic: <site id>`; inject `Byte8\Pulsar\Api\IsSyntheticRequestInterface` to skip age-verification, fraud-scoring or ERP calls for synthetic traffic;
+- every quote a run touches is tagged `pulsar+<site id>@synthetic.byte8.io` and deleted by cron after an hour;
+- the checkout funnel collector ignores them.
+
+Exclude that address in your marketing automation and analytics — see `docs/FEATURES.md` → *Synthetic Checkout Traffic*.
 
 ## Support
 

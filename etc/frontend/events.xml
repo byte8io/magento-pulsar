@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <!-- Tag quotes created by Pulsar's synthetic checkout runs so they can be
+         recognised, pruned and kept out of the checkout funnel. -->
+    <event name="sales_quote_save_before">
+        <observer name="byte8_pulsar_tag_synthetic_quote" instance="Byte8\Pulsar\Observer\TagSyntheticQuote"/>
+    </event>
+</config>

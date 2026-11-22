@@ -6,6 +6,7 @@ namespace Byte8\Pulsar\Model\Collector;
 
 use Byte8\Pulsar\Model\Config;
 use Byte8\Pulsar\Model\Funnel\FunnelEvaluator;
+use Byte8\Pulsar\Model\Synthetic\SyntheticIdentity;
 use Magento\Framework\App\CacheInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
@@ -158,19 +159,29 @@ class CheckoutFunnelCollector implements CollectorInterface
                  LEFT JOIN %s a ON a.quote_id = q.entity_id AND a.address_type = \'shipping\'
                  WHERE q.entity_id >= :lower_id
                    AND q.created_at >= :from_at AND q.created_at < :to_at
-                   AND q.items_count > 0',
+                   AND q.items_count > 0
+                   AND (q.customer_email IS NULL OR q.customer_email NOT LIKE :synthetic)',
                 $quoteTable,
                 $addressTable
             ),
-            ['lower_id' => $lowerQuoteId, 'from_at' => $fromStr, 'to_at' => $toStr]
+            [
+                'lower_id' => $lowerQuoteId,
+                'from_at' => $fromStr,
+                'to_at' => $toStr,
+                'synthetic' => SyntheticIdentity::EMAIL_LIKE,
+            ]
         );
 
+        // Pulsar's own checkout runs are tagged with the synthetic shopper
+        // email (Observer\TagSyntheticQuote) and must not count as carts.
         $orders = (int) $connection->fetchOne(
             sprintf(
-                'SELECT COUNT(*) FROM %s WHERE created_at >= :from_at AND created_at < :to_at',
+                'SELECT COUNT(*) FROM %s
+                 WHERE created_at >= :from_at AND created_at < :to_at
+                   AND (customer_email IS NULL OR customer_email NOT LIKE :synthetic)',
                 $orderTable
             ),
-            ['from_at' => $fromStr, 'to_at' => $toStr]
+            ['from_at' => $fromStr, 'to_at' => $toStr, 'synthetic' => SyntheticIdentity::EMAIL_LIKE]
         );
 
         return [

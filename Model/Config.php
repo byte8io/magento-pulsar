@@ -48,6 +48,8 @@ class Config
     // Detection-signature feed (pulled from pulsar-server's /signatures/bundle;
     // merged into ContentIntegrityCollector so detection tracks new zero-days
     // without a module release). See the Byte8 platform advisory-tasks doc §E.
+    private const XML_PATH_SYNTHETIC_PRUNE_ENABLED = 'byte8_pulsar/synthetic/prune_enabled';
+    private const XML_PATH_SYNTHETIC_PRUNE_AFTER_HOURS = 'byte8_pulsar/synthetic/prune_after_hours';
     private const XML_PATH_SIGNATURE_FEED_ENABLED = 'byte8_pulsar/signature_feed/enabled';
     private const XML_PATH_SIGNATURE_FEED_ENDPOINT = 'byte8_pulsar/signature_feed/endpoint';
     private const XML_PATH_SIGNATURE_FEED_TOKEN = 'byte8_pulsar/signature_feed/token';
@@ -60,6 +62,7 @@ class Config
     private const DEFAULT_CHECKOUT_FUNNEL_MIN_CARTS = 50;
     private const DEFAULT_CHECKOUT_FUNNEL_DEGRADED_DROP_PCT = 10.0;
     private const DEFAULT_CHECKOUT_FUNNEL_CRITICAL_DROP_PCT = 25.0;
+    private const DEFAULT_SYNTHETIC_PRUNE_AFTER_HOURS = 1;
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -70,6 +73,27 @@ class Config
     public function isEnabled(): bool
     {
         return $this->scopeConfig->isSetFlag(self::XML_PATH_ENABLED);
+    }
+
+    /**
+     * Whether the hourly cron deletes quotes left behind by Pulsar's
+     * synthetic checkout runs.
+     */
+    public function isSyntheticPruneEnabled(): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_SYNTHETIC_PRUNE_ENABLED);
+    }
+
+    /**
+     * Age (hours since last update) after which a synthetic quote is deleted.
+     */
+    public function getSyntheticPruneAfterHours(): int
+    {
+        return $this->positiveInt(
+            $this->scopeConfig->getValue(self::XML_PATH_SYNTHETIC_PRUNE_AFTER_HOURS),
+            self::DEFAULT_SYNTHETIC_PRUNE_AFTER_HOURS,
+            168
+        );
     }
 
     public function getApiKey(): ?string

@@ -213,7 +213,7 @@
                 <field id="transactional_email_enabled" translate="label comment" type="select" sortOrder="220" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Transactional Email Monitoring</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Detect sales confirmation emails (order/invoice/shipment/creditmemo) that were never sent: permanently lost sends (email_sent NULL after a failed synchronous send — Magento never retries these) and stuck async retry backlogs (email_sent 0 older than the send cron should allow).</comment>
+                    <comment>Detect sales confirmation emails (order/invoice/shipment/creditmemo) that Magento has given up on: with asynchronous sending, email_sent reaching 0 means every retry attempt was used; with synchronous sending, an unsent flag after the grace period means the send failed and will not be retried. Still-retrying documents are reported separately and do not affect status.</comment>
                 </field>
                 <field id="applied_patches_enabled" translate="label comment" type="select" sortOrder="230" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Applied Security Patches</label>
@@ -273,6 +273,22 @@
                     <comment>A stage becomes critical at this relative drop (default: 25 — e.g. 78% → 58%) with z ≥ 3.</comment>
                     <depends>
                         <field id="checkout_funnel_enabled">1</field>
+                    </depends>
+                </field>
+            </group>
+            <group id="synthetic" translate="label" sortOrder="25" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Synthetic Checkout Traffic</label>
+                <comment><![CDATA[Pulsar's checkout flow adds a product to cart as a fresh guest and, with the shipping step enabled, types a fixture address. Every request of a run carries the <code>X-Pulsar-Synthetic</code> header and every quote it touches is tagged with the shopper email <code>pulsar+&lt;site id&gt;@synthetic.byte8.io</code>. Those quotes are kept out of the Checkout Funnel collector and deleted by cron. Exclude the same address in your marketing automation (Klaviyo, Mailchimp, Dotdigital abandoned-cart flows) and analytics. Developers: inject <code>Byte8\Pulsar\Api\IsSyntheticRequestInterface</code> to skip third-party calls (age verification, fraud scoring, ERP sync) for synthetic runs.]]></comment>
+                <field id="prune_enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Delete Synthetic Quotes</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Hourly cron removes quotes carrying the synthetic shopper email once they are older than the age below (default: Yes).</comment>
+                </field>
+                <field id="prune_after_hours" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Delete After (hours)</label>
+                    <comment>Minimum age since the quote was last updated (default: 1, max 168). A run never lasts more than a few minutes.</comment>
+                    <depends>
+                        <field id="prune_enabled">1</field>
                     </depends>
                 </field>
             </group>
