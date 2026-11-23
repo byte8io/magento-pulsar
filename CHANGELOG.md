@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.16.0](https://github.com/byte8io/magento-pulsar/compare/v1.15.1...v1.16.0) (2026-11-23)
+
+
+### Features
+
+* checkout funnel collector, honest email_sent semantics, patch reclassification ([dec99f4](https://github.com/byte8io/magento-pulsar/commit/dec99f46abb2424d4f0bfef4567639fb722a7322))
+* detect shipped-but-uncaptured orders (deferred-capture flows) ([e28884c](https://github.com/byte8io/magento-pulsar/commit/e28884ce9f0045eae854e37183c2d13a20292222))
+* log-error known-noise allowlist + docs audit ([9e7e6e4](https://github.com/byte8io/magento-pulsar/commit/9e7e6e468ab427c5c0a150549ad34f50152fb43c))
+* recognise, tag and prune Pulsar synthetic checkout traffic ([c8f49f0](https://github.com/byte8io/magento-pulsar/commit/c8f49f028224facae06a148cfeb9316cf6b49a30))
+
+
+### Bug Fixes
+
+* capture-reconciliation detection for connector-fulfilled orders ([67c216b](https://github.com/byte8io/magento-pulsar/commit/67c216b985265b7066d370e7763896c4eb2aa575))
+* stable log-error signatures for GraphQL and ID payload slots ([7439404](https://github.com/byte8io/magento-pulsar/commit/7439404bda9aac5ea48ef3707ff6e9f3aa2c26cb))
+* treat a freshly invalidated indexer as pending, not critical ([8825afe](https://github.com/byte8io/magento-pulsar/commit/8825afefb2aaae0f13bd8aeeeaac3cc5e37601ef))
+
+
+### Documentation
+
+* install from Packagist, require Magento 2.4.6+ ([c91dec1](https://github.com/byte8io/magento-pulsar/commit/c91dec1f1ed20d17531b81371685aaa8540b8b05))
+
 ## [1.15.1](https://github.com/byte8io/magento-pulsar/compare/v1.15.0...v1.15.1) (2026-09-29)
 
 
