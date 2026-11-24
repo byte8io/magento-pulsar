@@ -11,8 +11,10 @@ use Magento\Framework\App\ResourceConnection;
  * Watches sales transactional emails (order / invoice / shipment / creditmemo
  * confirmations) that were requested but never handed to the mail transport.
  *
- * Magento 2.4.7+ uses email_sent as an attempt counter, not a flag
- * (Magento\Sales\Model\EmailSenderHandler::sendEmails):
+ * Magento 2.4.8+ uses email_sent as an attempt counter, not a flag
+ * (Magento\Sales\Model\EmailSenderHandler::sendEmails). Up to 2.4.7 the
+ * async cron only picks up NULL and leaves a failed send at NULL, so it is
+ * retried on every run and never reaches 0; the same classification holds.
  *
  *   NULL        async on:  queued, the send cron has not tried yet
  *               async off: the synchronous send threw after save — nothing
