@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.1](https://github.com/byte8io/magento-pulsar/compare/v1.16.0...v1.16.1) (2026-11-24)
+
+
+### Documentation
+
+* email_sent attempt counter starts in Magento 2.4.8 ([278c1f5](https://github.com/byte8io/magento-pulsar/commit/278c1f5e8aed49391c8859c872b56502c069f019))
+
 ## [1.16.0](https://github.com/byte8io/magento-pulsar/compare/v1.15.1...v1.16.0) (2026-11-23)
 
 
